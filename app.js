@@ -79,7 +79,7 @@
   const VIEW_LABELS = {
     home: 'الصفحة الرئيسية',
     challenges: 'صفحة التحديات',
-    blog: 'المدونة',
+    blog: 'المقالات',
     leaderboard: 'لوحة الصدارة',
   };
 
@@ -286,6 +286,8 @@
   const dialogCloseBtn = document.getElementById('dialog-close-btn');
   const dialogConfirmBtn = document.getElementById('dialog-confirm-btn');
   const dialogLeaderboardBtn = document.getElementById('dialog-leaderboard-btn');
+  const dialogExternalLink = document.getElementById('dialog-external-link');
+  const dialogExternalLinkText = document.getElementById('dialog-external-link-text');
 
   let blogArticles = FALLBACK_BLOG_ARTICLES;
   let activeFilter = 'all';
@@ -520,7 +522,11 @@
     },
     contact: {
       title: 'تواصل معنا',
-      desc: 'يسعدنا استقبال ملاحظاتكم ومقترحاتكم لتطوير التحديات وتحسين تجربة الوصولية الرقمية في اللعبة ضمن مبادرات #عام_الذكاء_الاصطناعي.',
+      desc: 'يسعدني استقبال ملاحظاتكم ومقترحاتكم لتطوير التحديات وتحسين تجربة الوصولية الرقمية في اللعبة عبر حسابي على LinkedIn.',
+      actionLink: {
+        label: 'التواصل عبر LinkedIn',
+        url: 'https://www.linkedin.com/in/maymunah-aldeghaither-1a6700201',
+      },
     },
   };
 
@@ -530,10 +536,10 @@
       container.querySelectorAll(
         'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
       )
-    );
+    ).filter((el) => !el.hidden && el.offsetParent !== null);
   }
 
-  function openDialog({ title, desc, showLeaderboardAction = true } = {}) {
+  function openDialog({ title, desc, showLeaderboardAction = true, actionLink = null } = {}) {
     if (!dialogBackdrop) return;
     lastFocusedBeforeDialog = document.activeElement;
 
@@ -547,9 +553,33 @@
       dialogLeaderboardBtn.hidden = !showLeaderboardAction;
     }
 
+    if (dialogExternalLink) {
+      if (actionLink && isSafeHttpUrl(actionLink.url)) {
+        dialogExternalLink.href = actionLink.url;
+        if (dialogExternalLinkText) {
+          dialogExternalLinkText.textContent = actionLink.label;
+        }
+        dialogExternalLink.hidden = false;
+        dialogConfirmBtn.classList.remove('btn-primary');
+        dialogConfirmBtn.classList.add('btn-secondary');
+        dialogConfirmBtn.textContent = 'إغلاق';
+      } else {
+        dialogExternalLink.hidden = true;
+        dialogExternalLink.removeAttribute('href');
+        dialogConfirmBtn.classList.add('btn-primary');
+        dialogConfirmBtn.classList.remove('btn-secondary');
+        dialogConfirmBtn.textContent = 'حسناً، فهمت';
+      }
+    }
+
     dialogBackdrop.hidden = false;
     document.body.style.overflow = 'hidden';
-    dialogConfirmBtn.focus();
+
+    if (dialogExternalLink && !dialogExternalLink.hidden) {
+      dialogExternalLink.focus();
+    } else {
+      dialogConfirmBtn.focus();
+    }
   }
 
   function openTopicDialog(topic) {
@@ -848,7 +878,7 @@
   if (blogBackBtn) {
     blogBackBtn.addEventListener('click', () => {
       showBlogList({ updateHash: true, moveFocus: true });
-      announce('تمت العودة إلى قائمة مقالات المدونة');
+      announce('تمت العودة إلى قائمة المقالات');
     });
   }
 
@@ -860,6 +890,7 @@
         title: policy.title,
         desc: policy.desc,
         showLeaderboardAction: false,
+        actionLink: policy.actionLink || null,
       });
     });
   });

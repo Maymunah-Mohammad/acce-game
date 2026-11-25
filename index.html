@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
   <a href="#main-content" class="skip-link">تخطَّ إلى المحتوى الرئيسي</a>
@@ -71,7 +71,7 @@
                 class="nav-link"
                 data-view-link="blog"
               >
-                المدونة
+                المقالات
               </a>
             </li>
             <li>
@@ -277,7 +277,7 @@
         </div>
       </section>
 
-      <!-- صفحة المدونة (الوصولية وآخر ما توصل له العلم) -->
+      <!-- صفحة المقالات (الوصولية وآخر ما توصل له العلم) -->
       <section
         id="blog-view"
         class="view-section blog-section"
@@ -294,7 +294,7 @@
                   <span class="eyebrow-dot" aria-hidden="true"></span>
                   <span>المعرفة وأحدث أبحاث الوصولية</span>
                 </div>
-                <h1 id="blog-heading" class="section-title">المدونة</h1>
+                <h1 id="blog-heading" class="section-title">المقالات</h1>
                 <p class="section-subtitle">
                   مقالات موثّقة حول تطور معايير W3C، ومستقبل WCAG 3.0، وآخر ما توصل له العلم والذكاء الاصطناعي في الوصولية الرقمية.
                 </p>
@@ -306,7 +306,7 @@
             </div>
 
             <div class="blog-toolbar">
-              <div class="filter-group" role="group" aria-label="تصفية مقالات المدونة">
+              <div class="filter-group" role="group" aria-label="تصفية المقالات">
                 <button type="button" class="filter-btn blog-filter-btn is-active" data-blog-filter="all" aria-pressed="true">الكل</button>
                 <button type="button" class="filter-btn blog-filter-btn" data-blog-filter="standards" aria-pressed="false">معايير W3C</button>
                 <button type="button" class="filter-btn blog-filter-btn" data-blog-filter="ai" aria-pressed="false">الذكاء الاصطناعي</button>
@@ -315,7 +315,7 @@
               <p class="leaderboard-count" id="blog-count" aria-live="polite"></p>
             </div>
 
-            <div class="blog-grid" id="blog-grid" aria-label="قائمة مقالات المدونة"></div>
+            <div class="blog-grid" id="blog-grid" aria-label="قائمة المقالات"></div>
           </div>
 
           <!-- قارئ المقال الكامل -->
@@ -393,7 +393,7 @@
     <footer id="footer" class="site-footer">
       <div class="container footer-stack">
         <div class="footer-top">
-          <!-- شعار ووسم عام الذكاء الاصطناعي 2026 -->
+          <!-- شعارا عام الذكاء الاصطناعي وصنع في السعودية -->
           <div class="ai-year-lockup">
             <img
               src="AIYear_Logo_Main.svg"
@@ -401,6 +401,14 @@
               class="ai-year-logo-img"
               width="142"
               height="52"
+            >
+            <span class="footer-logo-divider" aria-hidden="true"></span>
+            <img
+              src="شعار%20صنع%20في%20السعودية%20-%20SVG%20-%20PNG.png"
+              alt="شعار صنع في السعودية"
+              class="saudi-made-logo-img"
+              width="97"
+              height="50"
             >
             <span class="ai-year-hashtag">#عام_الذكاء_الاصطناعي</span>
           </div>
@@ -429,7 +437,7 @@
             </ul>
           </nav>
 
-          <p class="footer-copyright">© 2026 تحدّي الوصولية — جميع الحقوق محفوظة.</p>
+          <p class="footer-copyright">صنع بـ <span role="img" aria-label="حب">❤️</span> في الرياض</p>
         </div>
       </div>
     </footer>
@@ -465,12 +473,22 @@
         صفحة الهبوط جاهزة الآن! في الخطوة القادمة سنبني شاشة اللعب الفعلية وربط التحديات البصرية ونظام النقاط.
       </p>
       <div class="dialog-actions">
+        <a
+          href="#"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="btn btn-primary"
+          id="dialog-external-link"
+          hidden
+        >
+          <span id="dialog-external-link-text">التواصل عبر LinkedIn</span>
+        </a>
         <button type="button" class="btn btn-primary" id="dialog-confirm-btn">حسناً، فهمت</button>
         <button type="button" class="btn btn-secondary" id="dialog-leaderboard-btn">استعراض لوحة الصدارة</button>
       </div>
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=2"></script>
 </body>
 </html>

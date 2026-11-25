@@ -1379,6 +1379,22 @@ body {
   object-fit: contain;
 }
 
+.footer-logo-divider {
+  width: 1px;
+  height: 2.25rem;
+  background-color: var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.saudi-made-logo-img {
+  display: block;
+  height: 3.1rem;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+}
+
 .ai-year-hashtag {
   display: inline-flex;
   align-items: center;
