@@ -1,0 +1,40 @@
+name: Update Accessibility Blog via Gemini
+
+on:
+  schedule:
+    # يعمل تلقائياً كل يوم أحد الساعة 9:00 صباحاً بتوقيت السعودية (06:00 UTC)
+    - cron: '0 6 * * 0'
+  # يتيح لكِ تشغيله يدوياً في أي وقت من تبويب Actions في GitHub
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish-new-article:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Generate and append new accessibility article
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: node scripts/update-blog.mjs
+
+      - name: Commit and push updated blog-data.json
+        run: |
+          if git diff --quiet blog-data.json; then
+            echo "لا توجد تغييرات في blog-data.json."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add blog-data.json
+          git commit -m "blog: إضافة مقال جديد في الوصولية عبر Gemini API"
+          git push

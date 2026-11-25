@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="تحدّي الوصولية — لعبة تفاعلية لاختبار وتطوير مهاراتك في معايير الوصولية الرقمية WCAG 2.2 عبر 10 محاور و45 تحدياً بصرياً.">
+  <title>تحدّي الوصولية — لعبة معايير الوصولية الرقمية</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-link">تخطَّ إلى المحتوى الرئيسي</a>
+
+  <div class="page-shell">
+    <!-- شريط التنقل -->
+    <header class="site-header">
+      <div class="container header-inner">
+        <a href="#home" class="brand" data-view-link="home" aria-label="تحدّي الوصولية — الصفحة الرئيسية">
+          <span class="brand-mark" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="5.5" r="2.25" fill="currentColor"/>
+              <path d="M4.5 9.5H19.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+              <path d="M12 9.5V15M12 15L8.5 20.5M12 15L15.5 20.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span class="brand-text">
+            <span class="brand-title">تحدّي الوصولية</span>
+            <span class="brand-badge">WCAG 2.2</span>
+          </span>
+        </a>
+
+        <button
+          type="button"
+          class="menu-toggle"
+          id="menu-toggle"
+          aria-expanded="false"
+          aria-controls="primary-nav"
+          aria-label="فتح قائمة التنقل"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 7H20M4 12H20M4 17H20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+        </button>
+
+        <nav class="primary-nav" id="primary-nav" aria-label="التنقل الرئيسي">
+          <ul class="nav-list">
+            <li>
+              <a
+                href="#home"
+                class="nav-link is-active"
+                data-view-link="home"
+                aria-current="page"
+              >
+                الرئيسية
+              </a>
+            </li>
+            <li>
+              <a
+                href="#challenges"
+                class="nav-link"
+                data-view-link="challenges"
+              >
+                التحديات
+              </a>
+            </li>
+            <li>
+              <a
+                href="#blog"
+                class="nav-link"
+                data-view-link="blog"
+              >
+                المدونة
+              </a>
+            </li>
+            <li>
+              <a
+                href="#leaderboard"
+                class="nav-link"
+                data-view-link="leaderboard"
+              >
+                لوحة الصدارة
+              </a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <!-- المحتوى الرئيسي -->
+    <main id="main-content" class="site-main" tabindex="-1">
+      <!-- منطقة الإشعارات الصوتية لقارئات الشاشة -->
+      <div id="live-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+      <!-- صفحة الهبوط (الرئيسية) -->
+      <section
+        id="home-view"
+        class="view-section hero-section"
+        aria-labelledby="hero-heading"
+        data-view="home"
+      >
+        <div class="container hero-container">
+          <div class="hero-grid">
+            <!-- عمود النص والدعوة لاتخاذ إجراء -->
+            <div class="hero-content">
+              <div class="eyebrow">
+                <span class="eyebrow-dot" aria-hidden="true"></span>
+                <span>لعبة تعليمية تفاعلية لمعايير WCAG 2.2</span>
+              </div>
+
+              <h1 id="hero-heading" class="hero-title">
+                اكتشف أخطاء <span class="title-accent">الوصولية الرقمية</span> في لحظات
+              </h1>
+
+              <p class="hero-description">
+                درّب عينك على تمييز التجارب الشاملة من العوائق البصرية والتفاعلية عبر مقارنات واقعية مستوحاة من معايير الويب العالمية، ونافس الآخرين في لوحة الصدارة.
+              </p>
+
+              <div class="hero-actions">
+                <a href="#challenges" class="btn btn-primary" data-view-link="challenges">
+                  <span>ابدأ التحدّي الآن</span>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M19 12H5M5 12L11 6M5 12L11 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </a>
+
+                <a href="#leaderboard" class="btn btn-secondary" data-view-link="leaderboard">
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M8 21V11M16 21V7M12 21V3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                  </svg>
+                  <span>لوحة الصدارة</span>
+                </a>
+              </div>
+
+              <dl class="hero-stats" aria-label="إحصائيات اللعبة">
+                <div class="stat-item">
+                  <dt class="stat-label">محاور الوصولية</dt>
+                  <dd class="stat-value">10 محاور</dd>
+                </div>
+                <div class="stat-divider" aria-hidden="true"></div>
+                <div class="stat-item">
+                  <dt class="stat-label">التحديات البصرية</dt>
+                  <dd class="stat-value">45 تحدياً</dd>
+                </div>
+                <div class="stat-divider" aria-hidden="true"></div>
+                <div class="stat-item">
+                  <dt class="stat-label">المستوى المرجعي</dt>
+                  <dd class="stat-value">AA / AAA</dd>
+                </div>
+              </dl>
+            </div>
+
+            <!-- عمود الديكور البصري الخالص (بدون محتوى نصي) -->
+            <div class="hero-decor" aria-hidden="true">
+              <div class="decor-canvas">
+                <svg class="decor-svg" viewBox="0 0 480 440" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="grad-purple-pink" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stop-color="#D8B4FE"/>
+                      <stop offset="100%" stop-color="#F9A8D4"/>
+                    </linearGradient>
+                    <linearGradient id="grad-peach-yellow" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stop-color="#FDBA74"/>
+                      <stop offset="100%" stop-color="#FDE047"/>
+                    </linearGradient>
+                    <linearGradient id="grad-sky-purple" x1="0" y1="1" x2="1" y2="0">
+                      <stop offset="0%" stop-color="#7DD8E8"/>
+                      <stop offset="100%" stop-color="#C4B5FD"/>
+                    </linearGradient>
+                    <linearGradient id="grad-main-orb" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stop-color="#8B5CF6"/>
+                      <stop offset="100%" stop-color="#6D28D9"/>
+                    </linearGradient>
+                  </defs>
+
+                  <!-- هالات خلفية ناعمة -->
+                  <circle cx="345" cy="115" r="96" fill="#FCE7F3" opacity="0.88"/>
+                  <circle cx="130" cy="315" r="105" fill="#E0F7FA" opacity="0.9"/>
+                  <circle cx="350" cy="325" r="82" fill="#FEF9C3" opacity="0.92"/>
+
+                  <!-- شبكة نقاط ديكورية -->
+                  <g fill="#C4B5FD" opacity="0.7">
+                    <circle cx="58" cy="76" r="4"/>
+                    <circle cx="80" cy="76" r="4"/>
+                    <circle cx="102" cy="76" r="4"/>
+                    <circle cx="58" cy="98" r="4"/>
+                    <circle cx="80" cy="98" r="4"/>
+                    <circle cx="102" cy="98" r="4"/>
+                    <circle cx="58" cy="120" r="4"/>
+                    <circle cx="80" cy="120" r="4"/>
+                    <circle cx="102" cy="120" r="4"/>
+                  </g>
+
+                  <!-- قوس خوخي ناعم -->
+                  <path d="M275 88C275 56 301 30 333 30C365 30 391 56 391 88V172H275V88Z" fill="#FFEDD5" stroke="#FDBA74" stroke-width="2"/>
+
+                  <!-- بطاقة ديكورية سماوية -->
+                  <rect class="decor-float-slow" x="62" y="152" width="166" height="166" rx="34" fill="#FFFFFF" stroke="#7DD8E8" stroke-width="2.5"/>
+                  <rect class="decor-float-slow" x="84" y="174" width="122" height="122" rx="24" fill="url(#grad-sky-purple)" opacity="0.32"/>
+
+                  <!-- حلقات متداخلة -->
+                  <circle cx="145" cy="235" r="42" stroke="#7DD8E8" stroke-width="3" stroke-dasharray="9 7"/>
+                  <circle cx="145" cy="235" r="24" fill="#E0F7FA"/>
+
+                  <!-- الكتلة المركزية البنفسجية-الوردية -->
+                  <g class="decor-float">
+                    <rect x="172" y="96" width="196" height="220" rx="44" fill="#FFFFFF" stroke="#E9D5FF" stroke-width="2.5"/>
+                    <rect x="192" y="116" width="156" height="106" rx="28" fill="url(#grad-purple-pink)" opacity="0.55"/>
+
+                    <!-- دائرة مركزية بنفسجية متألقة -->
+                    <circle cx="270" cy="169" r="34" fill="url(#grad-main-orb)"/>
+                    <circle cx="270" cy="169" r="46" stroke="#C4B5FD" stroke-width="2.5" opacity="0.85"/>
+
+                    <!-- عناصر هندسية متوازنة أسفل البطاقة -->
+                    <rect x="192" y="240" width="96" height="24" rx="12" fill="#FEF9C3" stroke="#FDE047" stroke-width="1.5"/>
+                    <rect x="298" y="240" width="50" height="24" rx="12" fill="#FFEDD5" stroke="#FDBA74" stroke-width="1.5"/>
+                    <rect x="192" y="276" width="60" height="20" rx="10" fill="#E0F7FA"/>
+                    <rect x="262" y="276" width="86" height="20" rx="10" fill="#FCE7F3"/>
+                  </g>
+
+                  <!-- نصف دائرة صفراء خوخية سفلية -->
+                  <path class="decor-float-reverse" d="M250 374C250 340.863 276.863 314 310 314H342C375.137 314 402 340.863 402 374C402 385.046 393.046 394 382 394H270C258.954 394 250 385.046 250 374Z" fill="url(#grad-peach-yellow)" opacity="0.72"/>
+
+                  <!-- أقراص ونجوم ديكورية صغيرة -->
+                  <circle class="decor-float-reverse" cx="394" cy="196" r="22" fill="#FCE7F3" stroke="#F9A8D4" stroke-width="2.5"/>
+                  <circle cx="394" cy="196" r="8" fill="#F9A8D4"/>
+
+                  <rect class="decor-float" x="114" y="340" width="76" height="32" rx="16" fill="#F3E8FF" stroke="#D8B4FE" stroke-width="2"/>
+                  <circle cx="132" cy="356" r="6" fill="#A855F7"/>
+                  <circle cx="152" cy="356" r="6" fill="#F9A8D4"/>
+                  <circle cx="172" cy="356" r="6" fill="#7DD8E8"/>
+
+                  <!-- نجمتان ناعمتان -->
+                  <path d="M214 54L218 66L230 70L218 74L214 86L210 74L198 70L210 66L214 54Z" fill="#FDE047"/>
+                  <path d="M416 266L419 275L428 278L419 281L416 290L413 281L404 278L413 275L416 266Z" fill="#7DD8E8"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- قسم محاور اللعبة العشرة (مفتوح مباشرة تحت عنوان h1) -->
+          <div class="topics-block" aria-labelledby="topics-heading">
+            <h1 id="topics-heading" class="topics-heading">استكشف محاور اللعبة العشرة</h1>
+            <ul class="topics-grid" id="topics-grid" aria-label="قائمة محاور الوصولية العشرة"></ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- صفحة التحديات -->
+      <section
+        id="challenges-view"
+        class="view-section challenges-section"
+        aria-labelledby="challenges-heading"
+        data-view="challenges"
+        hidden
+      >
+        <div class="container">
+          <div class="section-header">
+            <div>
+              <div class="eyebrow">
+                <span class="eyebrow-dot" aria-hidden="true"></span>
+                <span>10 محاور • 45 تحدياً بصرياً</span>
+              </div>
+              <h1 id="challenges-heading" class="section-title">التحديات</h1>
+              <p class="section-subtitle">
+                اختر المحور الذي ترغب في خوض تحدياته لاختبار مهارتك في اكتشاف أخطاء الوصولية الرقمية.
+              </p>
+            </div>
+
+            <a href="#home" class="btn btn-secondary" data-view-link="home">
+              <span>العودة للرئيسية</span>
+            </a>
+          </div>
+
+          <ul class="challenges-grid" id="challenges-grid" aria-label="قائمة تحديات محاور الوصولية"></ul>
+        </div>
+      </section>
+
+      <!-- صفحة المدونة (الوصولية وآخر ما توصل له العلم) -->
+      <section
+        id="blog-view"
+        class="view-section blog-section"
+        aria-labelledby="blog-heading"
+        data-view="blog"
+        hidden
+      >
+        <div class="container">
+          <!-- قائمة المقالات -->
+          <div id="blog-list-container">
+            <div class="section-header">
+              <div>
+                <div class="eyebrow">
+                  <span class="eyebrow-dot" aria-hidden="true"></span>
+                  <span>المعرفة وأحدث أبحاث الوصولية</span>
+                </div>
+                <h1 id="blog-heading" class="section-title">المدونة</h1>
+                <p class="section-subtitle">
+                  مقالات موثّقة حول تطور معايير W3C، ومستقبل WCAG 3.0، وآخر ما توصل له العلم والذكاء الاصطناعي في الوصولية الرقمية.
+                </p>
+              </div>
+
+              <a href="#home" class="btn btn-secondary" data-view-link="home">
+                <span>العودة للرئيسية</span>
+              </a>
+            </div>
+
+            <div class="blog-toolbar">
+              <div class="filter-group" role="group" aria-label="تصفية مقالات المدونة">
+                <button type="button" class="filter-btn blog-filter-btn is-active" data-blog-filter="all" aria-pressed="true">الكل</button>
+                <button type="button" class="filter-btn blog-filter-btn" data-blog-filter="standards" aria-pressed="false">معايير W3C</button>
+                <button type="button" class="filter-btn blog-filter-btn" data-blog-filter="ai" aria-pressed="false">الذكاء الاصطناعي</button>
+                <button type="button" class="filter-btn blog-filter-btn" data-blog-filter="research" aria-pressed="false">أبحاث وتقنيات</button>
+              </div>
+              <p class="leaderboard-count" id="blog-count" aria-live="polite"></p>
+            </div>
+
+            <div class="blog-grid" id="blog-grid" aria-label="قائمة مقالات المدونة"></div>
+          </div>
+
+          <!-- قارئ المقال الكامل -->
+          <div id="blog-reader" class="blog-reader" hidden>
+            <div class="reader-topbar">
+              <button type="button" class="btn btn-secondary" id="blog-back-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>العودة إلى جميع المقالات</span>
+              </button>
+            </div>
+
+            <article id="blog-article-content" class="article-reader-card"></article>
+          </div>
+        </div>
+      </section>
+
+      <!-- قسم لوحة الصدارة -->
+      <section
+        id="leaderboard-view"
+        class="view-section leaderboard-section"
+        aria-labelledby="leaderboard-heading"
+        data-view="leaderboard"
+        hidden
+      >
+        <div class="container">
+          <div class="section-header">
+            <div>
+              <div class="eyebrow">
+                <span class="eyebrow-dot" aria-hidden="true"></span>
+                <span>أفضل خبراء الوصولية</span>
+              </div>
+              <h1 id="leaderboard-heading" class="section-title">لوحة الصدارة</h1>
+              <p class="section-subtitle">
+                تُرتَّب النتائج حسب أعلى النقاط وسرعة اكتشاف أخطاء الوصولية بدقة.
+              </p>
+            </div>
+
+            <a href="#home" class="btn btn-secondary" data-view-link="home">
+              <span>العودة للرئيسية</span>
+            </a>
+          </div>
+
+          <div class="leaderboard-card">
+            <div class="leaderboard-toolbar">
+              <div class="filter-group" role="group" aria-label="تصفية النتائج">
+                <button type="button" class="filter-btn is-active" data-filter="all" aria-pressed="true">الكل</button>
+                <button type="button" class="filter-btn" data-filter="week" aria-pressed="false">هذا الأسبوع</button>
+                <button type="button" class="filter-btn" data-filter="perfect" aria-pressed="false">دقة 95%+</button>
+              </div>
+              <p class="leaderboard-count" id="leaderboard-count" aria-live="polite"></p>
+            </div>
+
+            <div class="table-responsive" tabindex="0" role="region" aria-label="جدول ترتيب اللاعبين">
+              <table class="leaderboard-table">
+                <thead>
+                  <tr>
+                    <th scope="col">المركز</th>
+                    <th scope="col">اللاعب</th>
+                    <th scope="col">المحور الأبرز</th>
+                    <th scope="col">الدقة</th>
+                    <th scope="col">النقاط</th>
+                  </tr>
+                </thead>
+                <tbody id="leaderboard-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- الذيل -->
+    <footer id="footer" class="site-footer">
+      <div class="container footer-stack">
+        <div class="footer-top">
+          <!-- شعار ووسم عام الذكاء الاصطناعي 2026 -->
+          <div class="ai-year-lockup">
+            <img
+              src="AIYear_Logo_Main.svg"
+              alt="شعار عام الذكاء الاصطناعي 2026"
+              class="ai-year-logo-img"
+              width="142"
+              height="52"
+            >
+            <span class="ai-year-hashtag">#عام_الذكاء_الاصطناعي</span>
+          </div>
+
+          <div class="footer-brand">
+            <span class="footer-title">تحدّي الوصولية</span>
+            <p class="footer-copy">مبادرة تفاعلية لتعلّم معايير الوصولية الرقمية WCAG 2.2</p>
+          </div>
+        </div>
+
+        <div class="footer-bottom">
+          <nav class="footer-legal-nav" aria-label="روابط السياسات والاستخدام">
+            <ul class="footer-legal-list">
+              <li>
+                <button type="button" class="footer-legal-link" data-policy="terms">شروط الاستخدام</button>
+              </li>
+              <li>
+                <button type="button" class="footer-legal-link" data-policy="privacy">سياسة الخصوصية</button>
+              </li>
+              <li>
+                <button type="button" class="footer-legal-link" data-policy="accessibility">بيان الوصولية</button>
+              </li>
+              <li>
+                <button type="button" class="footer-legal-link" data-policy="contact">تواصل معنا</button>
+              </li>
+            </ul>
+          </nav>
+
+          <p class="footer-copyright">© 2026 تحدّي الوصولية — جميع الحقوق محفوظة.</p>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- نافذة حوارية عند النقر على ابدأ التحدّي -->
+  <div
+    id="start-dialog-backdrop"
+    class="dialog-backdrop"
+    hidden
+  >
+    <div
+      class="dialog-box"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="dialog-title"
+      aria-describedby="dialog-desc"
+    >
+      <div class="dialog-header">
+        <h2 id="dialog-title" class="dialog-title">جاهز لبدء التحدّي؟</h2>
+        <button
+          type="button"
+          class="dialog-close"
+          id="dialog-close-btn"
+          aria-label="إغلاق النافذة"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <p id="dialog-desc" class="dialog-desc">
+        صفحة الهبوط جاهزة الآن! في الخطوة القادمة سنبني شاشة اللعب الفعلية وربط التحديات البصرية ونظام النقاط.
+      </p>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-primary" id="dialog-confirm-btn">حسناً، فهمت</button>
+        <button type="button" class="btn btn-secondary" id="dialog-leaderboard-btn">استعراض لوحة الصدارة</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
