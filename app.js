@@ -1432,7 +1432,16 @@
     return { days, hours, minutes, seconds };
   }
 
-  function buildLinkedInShareText({ topic, correct, total, accuracy, errors, durationSeconds, rankTitle }) {
+  function buildLinkedInShareText({
+    topic,
+    correct,
+    total,
+    accuracy,
+    errors,
+    durationSeconds,
+    rankTitle,
+    shareUrl,
+  }) {
     return [
       `أتممت تحدّي «محور ${topic.ar}» في لعبة تحدّي الوصولية الرقمية!`,
       `• النتيجة: ${correct} من ${total} (${formatErrorsAr(errors)} • دقة ${accuracy}%)`,
@@ -1440,7 +1449,7 @@
       `• التقييم: ${rankTitle}`,
       '',
       `جرّبوا اختبار مهاراتكم في معايير WCAG 2.2 هنا:`,
-      PUBLIC_GAME_URL,
+      shareUrl || PUBLIC_GAME_URL,
       '',
       '#الوصولية_الرقمية #WCAG #عام_الذكاء_الاصطناعي #صنع_في_السعودية',
     ].join('\n');
@@ -1484,9 +1493,10 @@
       errors,
       durationSeconds,
       rankTitle,
+      shareUrl: sharePageUrl,
     });
-    const linkedInShareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
-      sharePageUrl
+    const linkedInShareUrl = `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(
+      shareText
     )}`;
 
     const leaderboardSectionHtml = state.savedToLeaderboard
@@ -1794,13 +1804,12 @@
     if (shareLinkedInBtn) {
       shareLinkedInBtn.addEventListener('click', () => {
         if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(shareText).then(() => {
-            if (copyStatus) {
-              copyStatus.textContent =
-                'تم فتح منشور LinkedIn بصورة الموقع ونتيجتك، ونُسخ نص المشاركة تلقائياً لتلصقيه داخل البوست (Cmd+V).';
-              copyStatus.hidden = false;
-            }
-          }).catch(() => {});
+          navigator.clipboard.writeText(shareText).catch(() => {});
+        }
+        if (copyStatus) {
+          copyStatus.textContent =
+            'تم فتح منشور LinkedIn بنص النتيجة وبطاقة الصورة (وإذا تأخر تحميل معاينة الصورة في LinkedIn اضغطي مسافة واحدة بعد الرابط).';
+          copyStatus.hidden = false;
         }
       });
     }

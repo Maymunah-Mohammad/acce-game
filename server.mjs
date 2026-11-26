@@ -335,6 +335,16 @@ const server = http.createServer(async (req, res) => {
     const reqUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
     const pathname = reqUrl.pathname;
 
+    /* robots.txt للسماح لبوتات المعاينة مثل LinkedInBot بدون 404 */
+    if (pathname === '/robots.txt' && (req.method === 'GET' || req.method === 'HEAD')) {
+      const robotsTxt = 'User-agent: *\nAllow: /\n';
+      res.writeHead(200, {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'public, max-age=86400',
+      });
+      return res.end(req.method === 'HEAD' ? undefined : robotsTxt);
+    }
+
     /* 0. صفحة مشاركة مخصّصة لـ LinkedIn Open Graph (تُظهر صورة الموقع ونتيجة المحور في البوست) */
     if (pathname === '/share' && (req.method === 'GET' || req.method === 'HEAD')) {
       const topicId = reqUrl.searchParams.get('topic') || '';
@@ -370,14 +380,18 @@ const server = http.createServer(async (req, res) => {
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="بطاقة تعريف لعبة تحدّي الوصولية الرقمية WCAG 2.2">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="${escapeHtmlAttr(ogTitle)}">
   <meta name="twitter:description" content="${escapeHtmlAttr(ogDesc)}">
   <meta name="twitter:image" content="${baseOrigin}/og-share-card.png">
-  <meta http-equiv="refresh" content="0;url=${baseOrigin}/">
 </head>
 <body>
-  <p>جاري تحويلك إلى <a href="${baseOrigin}/">تحدّي الوصولية</a>...</p>
+  <main>
+    <h1>${escapeHtmlAttr(ogTitle)}</h1>
+    <p>${escapeHtmlAttr(ogDesc)}</p>
+    <p><a href="${baseOrigin}/">انتقل إلى لعبة تحدّي الوصولية</a></p>
+  </main>
   <script>window.location.replace('${baseOrigin}/');</script>
 </body>
 </html>`;
