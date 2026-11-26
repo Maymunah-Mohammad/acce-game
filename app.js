@@ -1473,6 +1473,9 @@
       day: 'numeric',
     });
 
+    const sharePageUrl = `${PUBLIC_GAME_URL}/share?topic=${encodeURIComponent(
+      topic.id
+    )}&correct=${correct}&total=${total}&acc=${accuracy}&sec=${durationSeconds}`;
     const shareText = buildLinkedInShareText({
       topic,
       correct,
@@ -1482,7 +1485,9 @@
       durationSeconds,
       rankTitle,
     });
-    const linkedInShareUrl = `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(shareText)}`;
+    const linkedInShareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
+      sharePageUrl
+    )}`;
 
     const leaderboardSectionHtml = state.savedToLeaderboard
       ? `
@@ -1532,7 +1537,7 @@
       ? `
         <div class="cooldown-card" id="cooldown-card" aria-label="العدّاد التنازلي لإعادة اختبار المحور">
           <div class="cooldown-header">
-            <h3 class="cooldown-title">إعادة اختبار المحور تُفتح بعد شهر واحد</h3>
+            <h3 class="cooldown-title">يمكنك إعادة الإختبار بالمحور بعد :</h3>
             <p class="cooldown-note">متاح مجدداً بتاريخ ${escapeHtml(unlockDateFormatted)}</p>
           </div>
           <div class="countdown-grid" aria-hidden="true">
@@ -1782,8 +1787,24 @@
       });
     }
 
+    const shareLinkedInBtn = playShellCard.querySelector('#share-linkedin-btn');
     const copyBtn = playShellCard.querySelector('#copy-share-text-btn');
     const copyStatus = playShellCard.querySelector('#share-copy-status');
+
+    if (shareLinkedInBtn) {
+      shareLinkedInBtn.addEventListener('click', () => {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(shareText).then(() => {
+            if (copyStatus) {
+              copyStatus.textContent =
+                'تم فتح منشور LinkedIn بصورة الموقع ونتيجتك، ونُسخ نص المشاركة تلقائياً لتلصقيه داخل البوست (Cmd+V).';
+              copyStatus.hidden = false;
+            }
+          }).catch(() => {});
+        }
+      });
+    }
+
     if (copyBtn) {
       copyBtn.addEventListener('click', async () => {
         try {

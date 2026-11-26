@@ -300,10 +300,94 @@ function getClientIp(req) {
   return req.socket.remoteAddress || 'unknown';
 }
 
+const SHARE_TOPIC_NAMES = {
+  'navigation-predictability': 'التنقل وقابلية التنبؤ',
+  'interactive-focus': 'التركيز التفاعلي',
+  'forms-friction': 'النماذج وتقليل العوائق',
+  'color-appearance': 'الألوان والمظهر',
+  'typography-reading': 'الطباعة والقراءة',
+  'animation-motion': 'الحركة والرسوم المتحركة',
+  'layout-structure': 'التخطيط والبنية',
+  'media-images': 'الوسائط والصور',
+  'input-gestures': 'الإدخال والإيماءات',
+  'touch-targets': 'اللمس وأحجام الأهداف',
+};
+
+function escapeHtmlAttr(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function formatShareDuration(sec) {
+  const s = Math.max(1, Math.min(7200, Math.round(Number(sec) || 60)));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  if (m === 0) return `${r} ث`;
+  if (r === 0) return `${m} د`;
+  return `${m} د ${r} ث`;
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     const reqUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
     const pathname = reqUrl.pathname;
+
+    /* 0. صفحة مشاركة مخصّصة لـ LinkedIn Open Graph (تُظهر صورة الموقع ونتيجة المحور في البوست) */
+    if (pathname === '/share' && (req.method === 'GET' || req.method === 'HEAD')) {
+      const topicId = reqUrl.searchParams.get('topic') || '';
+      const topicAr = SHARE_TOPIC_NAMES[topicId];
+      const correct = Math.max(0, Math.min(50, Math.round(Number(reqUrl.searchParams.get('correct') || 0))));
+      const total = Math.max(1, Math.min(50, Math.round(Number(reqUrl.searchParams.get('total') || 9))));
+      const acc = Math.max(0, Math.min(100, Math.round(Number(reqUrl.searchParams.get('acc') || 100))));
+      const sec = reqUrl.searchParams.get('sec');
+
+      const baseOrigin = 'https://accessibility-game.up.railway.app';
+      const canonicalUrl = `${baseOrigin}${reqUrl.pathname}${reqUrl.search}`;
+      const ogTitle = topicAr
+        ? `أتممت محور «${topicAr}» بدقة ${acc}% في تحدّي الوصولية!`
+        : 'تحدّي الوصولية — اختبر مهاراتك في معايير WCAG 2.2';
+      const ogDesc = topicAr
+        ? `${correct} من ${total} تحديات صحيحة${sec ? ` خلال ${formatShareDuration(sec)}` : ''} وفق معايير WCAG 2.2 — جرّب اختبار مهاراتك في الوصولية الرقمية الآن!`
+        : 'لعبة تعليمية تفاعلية لاكتشاف أخطاء الوصولية الرقمية عبر 10 محاور و45 تحدياً بصرياً ضمن مبادرات #عام_الذكاء_الاصطناعي.';
+
+      const html = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>${escapeHtmlAttr(ogTitle)}</title>
+  <meta name="description" content="${escapeHtmlAttr(ogDesc)}">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ar_SA">
+  <meta property="og:site_name" content="تحدّي الوصولية">
+  <meta property="og:title" content="${escapeHtmlAttr(ogTitle)}">
+  <meta property="og:description" content="${escapeHtmlAttr(ogDesc)}">
+  <meta property="og:url" content="${escapeHtmlAttr(canonicalUrl)}">
+  <meta property="og:image" content="${baseOrigin}/og-share-card.png">
+  <meta property="og:image:secure_url" content="${baseOrigin}/og-share-card.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${escapeHtmlAttr(ogTitle)}">
+  <meta name="twitter:description" content="${escapeHtmlAttr(ogDesc)}">
+  <meta name="twitter:image" content="${baseOrigin}/og-share-card.png">
+  <meta http-equiv="refresh" content="0;url=${baseOrigin}/">
+</head>
+<body>
+  <p>جاري تحويلك إلى <a href="${baseOrigin}/">تحدّي الوصولية</a>...</p>
+  <script>window.location.replace('${baseOrigin}/');</script>
+</body>
+</html>`;
+
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'public, max-age=300',
+      });
+      return res.end(req.method === 'HEAD' ? undefined : html);
+    }
 
     /* 1. فحص الصحة لـ Railway */
     if (pathname === '/api/health' && req.method === 'GET') {
