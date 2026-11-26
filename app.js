@@ -1180,7 +1180,7 @@
     entries.forEach((entry, index) => {
       const rank = index + 1;
       const rankClass = rank <= 3 ? `rank-${rank}` : '';
-      const topMedals = { 1: '🥇', 2: '🥈', 3: '🥉' };
+      const topMedals = { 1: '😎', 2: '😤', 3: '😅' };
       const medalHtml = topMedals[rank]
         ? `<span class="player-medal" aria-hidden="true">${topMedals[rank]}</span>`
         : '';

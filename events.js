@@ -1523,7 +1523,7 @@
       return '<p class="event-empty-players">لم ينضم مشاركون بجوالاتهم في هذه الجلسة.</p>';
     }
     const top3 = players.slice(0, 3);
-    const medals = ['🥇', '🥈', '🥉'];
+    const medals = ['😎', '😤', '😅'];
     const podiumHtml = `
       <div class="event-podium" aria-label="منصة الفائزين">
         ${top3
