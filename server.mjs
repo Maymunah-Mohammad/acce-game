@@ -2,13 +2,15 @@
 /**
  * خادم Node.js خفيف ومهيأ للنشر على Railway بدون أي مكتبات خارجية.
  * - يقدّم ملفات الموقع الساكنة ومجلدات الصور بأمان.
- * - يدير قاعدة بيانات SQLite (node:sqlite) للوحة الصدارة في مجلد التخزين الدائم (DATA_DIR أو /data).
+ * - يدير المصادقة الحقيقية عبر Google و LinkedIn (OAuth 2.0 / OpenID Connect) مع جلسات موقّعة بـ HMAC-SHA256.
+ * - يدير قاعدة بيانات SQLite (node:sqlite) للمستخدمين ولوحة الصدارة في مجلد التخزين الدائم (DATA_DIR أو /data).
  * - يرتّب لوحة الصدارة حسب: عدد المحاور المكتملة (الأكثر أفضل) ثم معدل الوقت المستغرق (الأقصر أفضل)،
  *   ويحسب «المحور الأبرز» لكل لاعب باعتباره المحور الأقل أخطاءً والأسرع إتماماً.
  */
 
 import http from 'node:http';
-import { existsSync, mkdirSync, copyFileSync, readFileSync } from 'node:fs';
+import crypto from 'node:crypto';
+import { existsSync, mkdirSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,16 +30,57 @@ mkdirSync(DATA_DIR, { recursive: true });
 const SEED_BLOG_PATH = path.join(__dirname, 'blog-data.json');
 const RUNTIME_BLOG_PATH = path.join(DATA_DIR, 'blog-data.json');
 const DB_PATH = path.join(DATA_DIR, 'leaderboard.sqlite');
+const SECRET_PATH = path.join(DATA_DIR, '.session-secret');
 
 if (!existsSync(RUNTIME_BLOG_PATH) && existsSync(SEED_BLOG_PATH)) {
   copyFileSync(SEED_BLOG_PATH, RUNTIME_BLOG_PATH);
 }
 
-/* تهيئة وترقية قاعدة بيانات SQLite للوحة الصدارة دون فقدان أي بيانات سابقة */
+/* سر توقيع الجلسات: يُقرأ من المتغير البيئي أو يُولَّد ويُحفظ محلياً في DATA_DIR */
+function loadOrCreateSessionSecret() {
+  if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.trim().length >= 16) {
+    return process.env.SESSION_SECRET.trim();
+  }
+  if (existsSync(SECRET_PATH)) {
+    const saved = readFileSync(SECRET_PATH, 'utf8').trim();
+    if (saved.length >= 16) return saved;
+  }
+  const generated = crypto.randomBytes(32).toString('hex');
+  writeFileSync(SECRET_PATH, generated, { mode: 0o600 });
+  return generated;
+}
+
+const SESSION_SECRET = loadOrCreateSessionSecret();
+const SESSION_COOKIE = 'a11y_session';
+const OAUTH_STATE_COOKIE = 'a11y_oauth_state';
+const SESSION_MAX_AGE_SEC = 30 * 24 * 60 * 60; /* 30 يوماً */
+
+const GOOGLE_CLIENT_ID = (process.env.GOOGLE_CLIENT_ID || '').trim();
+const GOOGLE_CLIENT_SECRET = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
+const LINKEDIN_CLIENT_ID = (process.env.LINKEDIN_CLIENT_ID || '').trim();
+const LINKEDIN_CLIENT_SECRET = (process.env.LINKEDIN_CLIENT_SECRET || '').trim();
+
+const hasGoogleAuth = Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET);
+const hasLinkedInAuth = Boolean(LINKEDIN_CLIENT_ID && LINKEDIN_CLIENT_SECRET);
+
+/* تهيئة وترقية قاعدة بيانات SQLite (المستخدمون + لوحة الصدارة) دون فقدان أي بيانات سابقة */
 const db = new DatabaseSync(DB_PATH);
 db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider TEXT NOT NULL CHECK (provider IN ('google', 'linkedin')),
+    provider_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL DEFAULT '',
+    avatar_url TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (provider, provider_id)
+  );
+
   CREATE TABLE IF NOT EXISTS scores (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER REFERENCES users(id),
     name TEXT NOT NULL,
     topic_id TEXT NOT NULL DEFAULT '',
     topic TEXT NOT NULL,
@@ -49,50 +92,48 @@ db.exec(`
   );
 `);
 
-const columns = new Set(
+const scoreColumns = new Set(
   db.prepare('PRAGMA table_info(scores)').all().map((col) => col.name)
 );
 
-if (!columns.has('topic_id')) {
+if (!scoreColumns.has('user_id')) {
+  db.exec(`ALTER TABLE scores ADD COLUMN user_id INTEGER REFERENCES users(id)`);
+}
+if (!scoreColumns.has('topic_id')) {
   db.exec(`ALTER TABLE scores ADD COLUMN topic_id TEXT NOT NULL DEFAULT ''`);
 }
-if (!columns.has('errors')) {
+if (!scoreColumns.has('errors')) {
   db.exec(`ALTER TABLE scores ADD COLUMN errors INTEGER NOT NULL DEFAULT 0`);
 }
-if (!columns.has('duration_seconds')) {
+if (!scoreColumns.has('duration_seconds')) {
   db.exec(`ALTER TABLE scores ADD COLUMN duration_seconds INTEGER NOT NULL DEFAULT 90`);
 }
 
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_scores_player ON scores (name, topic);
+  CREATE INDEX IF NOT EXISTS idx_scores_user ON scores (user_id, topic_id);
 `);
 
 const SEED_ATTEMPTS = [
-  /* سارة العتيبي — 4 محاور مكتملة، الأبرز: الألوان والمظهر (0 أخطاء، 48 ث) */
   { name: 'سارة العتيبي', topicId: 'color-appearance', topic: 'الألوان والمظهر', accuracy: 100, errors: 0, durationSeconds: 48, score: 440, daysAgo: 1 },
   { name: 'سارة العتيبي', topicId: 'navigation-predictability', topic: 'التنقل وقابلية التنبؤ', accuracy: 100, errors: 0, durationSeconds: 92, score: 1040, daysAgo: 1 },
   { name: 'سارة العتيبي', topicId: 'interactive-focus', topic: 'التركيز التفاعلي', accuracy: 86, errors: 1, durationSeconds: 84, score: 660, daysAgo: 2 },
   { name: 'سارة العتيبي', topicId: 'touch-targets', topic: 'اللمس وأحجام الأهداف', accuracy: 100, errors: 0, durationSeconds: 56, score: 220, daysAgo: 2 },
 
-  /* خالد الحربي — 3 محاور مكتملة، الأبرز: التركيز التفاعلي (0 أخطاء، 62 ث) */
   { name: 'خالد الحربي', topicId: 'interactive-focus', topic: 'التركيز التفاعلي', accuracy: 100, errors: 0, durationSeconds: 62, score: 800, daysAgo: 2 },
   { name: 'خالد الحربي', topicId: 'navigation-predictability', topic: 'التنقل وقابلية التنبؤ', accuracy: 89, errors: 1, durationSeconds: 88, score: 900, daysAgo: 2 },
   { name: 'خالد الحربي', topicId: 'forms-friction', topic: 'النماذج وتقليل العوائق', accuracy: 100, errors: 0, durationSeconds: 72, score: 680, daysAgo: 3 },
 
-  /* نورة القحطاني — 3 محاور مكتملة، وقت أطول قليلاً من خالد */
   { name: 'نورة القحطاني', topicId: 'forms-friction', topic: 'النماذج وتقليل العوائق', accuracy: 100, errors: 0, durationSeconds: 70, score: 680, daysAgo: 9 },
   { name: 'نورة القحطاني', topicId: 'navigation-predictability', topic: 'التنقل وقابلية التنبؤ', accuracy: 89, errors: 1, durationSeconds: 104, score: 880, daysAgo: 9 },
   { name: 'نورة القحطاني', topicId: 'typography-reading', topic: 'الطباعة والقراءة', accuracy: 100, errors: 0, durationSeconds: 82, score: 440, daysAgo: 10 },
 
-  /* عبدالله الشمري — محوران */
   { name: 'عبدالله الشمري', topicId: 'navigation-predictability', topic: 'التنقل وقابلية التنبؤ', accuracy: 89, errors: 1, durationSeconds: 78, score: 900, daysAgo: 3 },
   { name: 'عبدالله الشمري', topicId: 'layout-structure', topic: 'التخطيط والبنية', accuracy: 100, errors: 0, durationSeconds: 54, score: 340, daysAgo: 3 },
 
-  /* ريم الدوسري — محوران */
   { name: 'ريم الدوسري', topicId: 'typography-reading', topic: 'الطباعة والقراءة', accuracy: 100, errors: 0, durationSeconds: 68, score: 440, daysAgo: 11 },
   { name: 'ريم الدوسري', topicId: 'media-images', topic: 'الوسائط والصور', accuracy: 67, errors: 1, durationSeconds: 96, score: 200, daysAgo: 12 },
 
-  /* فيصل الزهراني — محور واحد */
   { name: 'فيصل الزهراني', topicId: 'layout-structure', topic: 'التخطيط والبنية', accuracy: 100, errors: 0, durationSeconds: 58, score: 340, daysAgo: 4 },
 ];
 
@@ -116,12 +157,152 @@ if (existingCount === 0) {
   }
 }
 
+/* أدوات الكوكيز والجلسات الموقّعة */
+function parseCookies(req) {
+  const header = req.headers.cookie || '';
+  const map = {};
+  for (const part of header.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx === -1) continue;
+    const key = part.slice(0, idx).trim();
+    const val = part.slice(idx + 1).trim();
+    if (key) {
+      try {
+        map[key] = decodeURIComponent(val);
+      } catch {
+        map[key] = val;
+      }
+    }
+  }
+  return map;
+}
+
+function signPayload(payloadObj) {
+  const encoded = Buffer.from(JSON.stringify(payloadObj), 'utf8').toString('base64url');
+  const sig = crypto
+    .createHmac('sha256', SESSION_SECRET)
+    .update(encoded)
+    .digest('base64url');
+  return `${encoded}.${sig}`;
+}
+
+function verifySignedToken(token) {
+  if (typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length !== 2) return null;
+  const [encoded, sig] = parts;
+  const expected = crypto
+    .createHmac('sha256', SESSION_SECRET)
+    .update(encoded)
+    .digest('base64url');
+  const sigBuf = Buffer.from(sig);
+  const expBuf = Buffer.from(expected);
+  if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
+    if (parsed.exp && Date.now() > parsed.exp) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function getRequestOrigin(req) {
+  if (process.env.APP_ORIGIN && /^https?:\/\//i.test(process.env.APP_ORIGIN)) {
+    return process.env.APP_ORIGIN.replace(/\/+$/, '');
+  }
+  const protoHeader = req.headers['x-forwarded-proto'];
+  const proto =
+    typeof protoHeader === 'string' && protoHeader.length > 0
+      ? protoHeader.split(',')[0].trim()
+      : 'http';
+  const host = req.headers['x-forwarded-host'] || req.headers.host || `localhost:${PORT}`;
+  return `${proto}://${host}`;
+}
+
+function isSecureRequest(req) {
+  const origin = getRequestOrigin(req);
+  return origin.startsWith('https://');
+}
+
+function serializeCookie(name, value, { maxAge, secure, httpOnly = true, sameSite = 'Lax', path: cookiePath = '/' } = {}) {
+  const parts = [`${name}=${encodeURIComponent(value)}`, `Path=${cookiePath}`, `SameSite=${sameSite}`];
+  if (httpOnly) parts.push('HttpOnly');
+  if (secure) parts.push('Secure');
+  if (typeof maxAge === 'number') parts.push(`Max-Age=${maxAge}`);
+  return parts.join('; ');
+}
+
+function getSessionUser(req) {
+  const cookies = parseCookies(req);
+  const data = verifySignedToken(cookies[SESSION_COOKIE]);
+  if (!data || !data.uid) return null;
+  const user = db
+    .prepare('SELECT id, provider, name, email, avatar_url FROM users WHERE id = ?')
+    .get(Number(data.uid));
+  if (!user) return null;
+  return {
+    id: user.id,
+    provider: user.provider,
+    name: user.name,
+    email: user.email,
+    avatarUrl: user.avatar_url,
+  };
+}
+
+function upsertOAuthUser({ provider, providerId, name, email, avatarUrl }) {
+  const cleanName = String(name || email?.split('@')[0] || 'لاعب الوصولية').trim().slice(0, 40);
+  const cleanEmail = String(email || '').trim().slice(0, 120);
+  const cleanAvatar = typeof avatarUrl === 'string' && /^https?:\/\//i.test(avatarUrl) ? avatarUrl.slice(0, 400) : '';
+
+  const existing = db
+    .prepare('SELECT id FROM users WHERE provider = ? AND provider_id = ?')
+    .get(provider, providerId);
+
+  if (existing) {
+    db.prepare(
+      `UPDATE users SET name = ?, email = ?, avatar_url = ?, updated_at = datetime('now') WHERE id = ?`
+    ).run(cleanName, cleanEmail, cleanAvatar, existing.id);
+    return {
+      id: existing.id,
+      provider,
+      name: cleanName,
+      email: cleanEmail,
+      avatarUrl: cleanAvatar,
+    };
+  }
+
+  const inserted = db
+    .prepare(
+      `INSERT INTO users (provider, provider_id, name, email, avatar_url)
+       VALUES (?, ?, ?, ?, ?)`
+    )
+    .run(provider, providerId, cleanName, cleanEmail, cleanAvatar);
+
+  return {
+    id: Number(inserted.lastInsertRowid),
+    provider,
+    name: cleanName,
+    email: cleanEmail,
+    avatarUrl: cleanAvatar,
+  };
+}
+
+function sanitizeReturnHash(raw) {
+  if (typeof raw !== 'string') return '#challenges';
+  const trimmed = raw.trim();
+  if (/^#[a-z0-9/_-]+$/i.test(trimmed)) return trimmed;
+  return '#challenges';
+}
+
 /* حد بسيط لطلبات الإرسال لكل عنوان IP لمنع الإغراق */
 const rateLimitMap = new Map();
 function isRateLimited(ip) {
   const now = Date.now();
   const windowMs = 60_000;
-  const maxRequests = 15;
+  const maxRequests = 20;
   const recent = (rateLimitMap.get(ip) || []).filter((ts) => now - ts < windowMs);
   recent.push(now);
   rateLimitMap.set(ip, recent);
@@ -160,6 +341,15 @@ function sendJson(res, statusCode, payload, extraHeaders = {}) {
   res.end(body);
 }
 
+function redirect(res, location, cookies = []) {
+  const headers = { Location: location, 'Cache-Control': 'no-store' };
+  if (cookies.length > 0) {
+    headers['Set-Cookie'] = cookies;
+  }
+  res.writeHead(302, headers);
+  res.end();
+}
+
 async function readJsonBody(req, maxBytes = 8192) {
   const chunks = [];
   let total = 0;
@@ -189,6 +379,7 @@ function getAggregatedLeaderboard(filter = 'all') {
   const rows = db
     .prepare(
       `SELECT
+         user_id,
          name,
          topic_id,
          topic,
@@ -205,8 +396,10 @@ function getAggregatedLeaderboard(filter = 'all') {
   const playersMap = new Map();
 
   for (const row of rows) {
-    const playerKey = String(row.name || '').trim().toLowerCase();
-    if (!playerKey) continue;
+    const playerKey = row.user_id
+      ? `uid:${row.user_id}`
+      : `name:${String(row.name || '').trim().toLowerCase()}`;
+    if (!row.name || !String(row.name).trim()) continue;
 
     if (!playersMap.has(playerKey)) {
       playersMap.set(playerKey, {
@@ -246,7 +439,6 @@ function getAggregatedLeaderboard(filter = 'all') {
         topicsCompleted
     );
 
-    /* المحور الأبرز: الأقل أخطاءً ثم الأقل وقتاً لإتمامه */
     let standout = bestAttempts[0];
     for (const attempt of bestAttempts) {
       if (isBetterAttempt(attempt, standout)) {
@@ -267,7 +459,6 @@ function getAggregatedLeaderboard(filter = 'all') {
     });
   }
 
-  /* الترتيب: الأكثر محاور أولاً، ثم الأقصر في معدل الوقت، ثم الأعلى دقة */
   allPlayers.sort((a, b) => {
     if (b.topicsCompleted !== a.topicsCompleted) {
       return b.topicsCompleted - a.topicsCompleted;
@@ -330,9 +521,130 @@ function formatShareDuration(sec) {
   return `${m} د ${r} ث`;
 }
 
+/* =========================================================================
+   محرّك غرف الفعاليات الجماعية الحية (بأسلوب Kahoot & Slido عبر SSE)
+   ========================================================================= */
+
+const EVENT_ROOMS = new Map();
+const EVENT_ROOM_TTL_MS = 3 * 60 * 60 * 1000; /* 3 ساعات */
+const VALID_EVENT_GAMES = new Set(['right-or-left', 'ten-in-a-row', 'speed-blitz']);
+
+function cleanupExpiredEventRooms() {
+  const now = Date.now();
+  for (const [code, room] of EVENT_ROOMS.entries()) {
+    if (now - room.updatedAt > EVENT_ROOM_TTL_MS) {
+      for (const client of room.clients) {
+        try {
+          client.end();
+        } catch {
+          /* تجاهل */
+        }
+      }
+      EVENT_ROOMS.delete(code);
+    }
+  }
+}
+
+setInterval(cleanupExpiredEventRooms, 15 * 60 * 1000).unref();
+
+function generateRoomCode() {
+  for (let i = 0; i < 30; i += 1) {
+    const code = String(crypto.randomInt(100000, 999999));
+    if (!EVENT_ROOMS.has(code)) return code;
+  }
+  return String(crypto.randomInt(100000, 999999));
+}
+
+function sanitizeEventDeck(rawDeck) {
+  if (!Array.isArray(rawDeck)) return [];
+  const cleaned = [];
+  for (const item of rawDeck.slice(0, 60)) {
+    if (!item || typeof item.challengeId !== 'string') continue;
+    const challengeId = item.challengeId.trim().slice(0, 80);
+    if (!challengeId) continue;
+    const goodSide = item.goodSide === 'left' ? 'left' : 'right';
+    cleaned.push({ challengeId, goodSide });
+  }
+  return cleaned;
+}
+
+function serializeEventRoom(room) {
+  const currentCard = room.deck[room.roundIndex] || null;
+  const playersList = Array.from(room.players.values())
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      score: p.score,
+      correctCount: p.correctCount,
+      streak: p.streak,
+    }))
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (b.correctCount !== a.correctCount) return b.correctCount - a.correctCount;
+      return a.name.localeCompare(b.name, 'ar');
+    });
+
+  let rightVotes = 0;
+  let leftVotes = 0;
+  for (const vote of room.votes.values()) {
+    if (vote.side === 'right') rightVotes += 1;
+    else if (vote.side === 'left') leftVotes += 1;
+  }
+  const totalVotes = rightVotes + leftVotes;
+
+  return {
+    code: room.code,
+    gameType: room.gameType,
+    status: room.status,
+    roundIndex: room.roundIndex,
+    totalRounds: room.totalRounds,
+    streak: room.streak,
+    bestStreak: room.bestStreak,
+    attemptNumber: room.attemptNumber,
+    streakFailed: room.streakFailed,
+    won: room.won,
+    timerSeconds: room.timerSeconds,
+    roundStartedAt: room.roundStartedAt,
+    blitzEndsAt: room.blitzEndsAt,
+    serverNow: Date.now(),
+    currentCard,
+    playerCount: room.players.size,
+    players: playersList,
+    votesCount: totalVotes,
+    votes:
+      room.status === 'revealed' || room.status === 'finished'
+        ? {
+            right: rightVotes,
+            left: leftVotes,
+            total: totalVotes,
+            rightPct: totalVotes > 0 ? Math.round((rightVotes / totalVotes) * 100) : 0,
+            leftPct: totalVotes > 0 ? Math.round((leftVotes / totalVotes) * 100) : 0,
+          }
+        : {
+            total: totalVotes,
+          },
+    lastOutcome: room.lastOutcome,
+    groupCorrectTotal: room.groupCorrectTotal,
+  };
+}
+
+function broadcastEventRoom(room) {
+  room.updatedAt = Date.now();
+  const payload = `data: ${JSON.stringify(serializeEventRoom(room))}\n\n`;
+  for (const client of room.clients) {
+    try {
+      client.write(payload);
+    } catch {
+      room.clients.delete(client);
+    }
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   try {
-    const reqUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+    const origin = getRequestOrigin(req);
+    const secure = isSecureRequest(req);
+    const reqUrl = new URL(req.url || '/', origin);
     const pathname = reqUrl.pathname;
 
     /* robots.txt للسماح لبوتات المعاينة مثل LinkedInBot بدون 404 */
@@ -345,7 +657,7 @@ const server = http.createServer(async (req, res) => {
       return res.end(req.method === 'HEAD' ? undefined : robotsTxt);
     }
 
-    /* 0. صفحة مشاركة مخصّصة لـ LinkedIn Open Graph (تُظهر صورة الموقع ونتيجة المحور في البوست) */
+    /* صفحة مشاركة مخصّصة لـ LinkedIn Open Graph */
     if (pathname === '/share' && (req.method === 'GET' || req.method === 'HEAD')) {
       const topicId = reqUrl.searchParams.get('topic') || '';
       const topicAr = SHARE_TOPIC_NAMES[topicId];
@@ -403,6 +715,220 @@ const server = http.createServer(async (req, res) => {
       return res.end(req.method === 'HEAD' ? undefined : html);
     }
 
+    /* =====================================================================
+       مسارات المصادقة (Google OAuth 2.0 + LinkedIn OpenID Connect)
+       ===================================================================== */
+
+    if (pathname === '/api/auth/me' && req.method === 'GET') {
+      const user = getSessionUser(req);
+      return sendJson(res, 200, {
+        user,
+        providers: {
+          google: hasGoogleAuth,
+          linkedin: hasLinkedInAuth,
+        },
+        callbackUrls: {
+          google: `${origin}/auth/google/callback`,
+          linkedin: `${origin}/auth/linkedin/callback`,
+        },
+      });
+    }
+
+    if (pathname === '/api/auth/logout' && req.method === 'POST') {
+      const clearCookie = serializeCookie(SESSION_COOKIE, '', { maxAge: 0, secure });
+      return sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearCookie });
+    }
+
+    /* بدء تسجيل الدخول عبر Google */
+    if (pathname === '/auth/google' && req.method === 'GET') {
+      const returnHash = sanitizeReturnHash(reqUrl.searchParams.get('returnTo'));
+      if (!hasGoogleAuth) {
+        return redirect(res, `/?authError=google_not_configured${returnHash}`);
+      }
+      const nonce = crypto.randomBytes(16).toString('hex');
+      const stateToken = signPayload({
+        provider: 'google',
+        nonce,
+        returnHash,
+        exp: Date.now() + 10 * 60 * 1000,
+      });
+      const stateCookie = serializeCookie(OAUTH_STATE_COOKIE, stateToken, {
+        maxAge: 600,
+        secure,
+      });
+      const params = new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        redirect_uri: `${origin}/auth/google/callback`,
+        response_type: 'code',
+        scope: 'openid email profile',
+        state: nonce,
+        prompt: 'select_account',
+      });
+      return redirect(
+        res,
+        `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
+        [stateCookie]
+      );
+    }
+
+    /* استقبال رد Google OAuth */
+    if (pathname === '/auth/google/callback' && req.method === 'GET') {
+      const cookies = parseCookies(req);
+      const savedState = verifySignedToken(cookies[OAUTH_STATE_COOKIE]);
+      const clearState = serializeCookie(OAUTH_STATE_COOKIE, '', { maxAge: 0, secure });
+      const returnHash = sanitizeReturnHash(savedState?.returnHash);
+
+      const code = reqUrl.searchParams.get('code');
+      const stateParam = reqUrl.searchParams.get('state');
+      if (!hasGoogleAuth || !code || !savedState || savedState.provider !== 'google' || savedState.nonce !== stateParam) {
+        return redirect(res, `/?authError=google_failed${returnHash}`, [clearState]);
+      }
+
+      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code,
+          client_id: GOOGLE_CLIENT_ID,
+          client_secret: GOOGLE_CLIENT_SECRET,
+          redirect_uri: `${origin}/auth/google/callback`,
+          grant_type: 'authorization_code',
+        }),
+      });
+
+      if (!tokenRes.ok) {
+        console.error('Google token exchange failed:', await tokenRes.text());
+        return redirect(res, `/?authError=google_failed${returnHash}`, [clearState]);
+      }
+
+      const tokenData = await tokenRes.json();
+      const userInfoRes = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+
+      if (!userInfoRes.ok) {
+        console.error('Google userinfo failed:', await userInfoRes.text());
+        return redirect(res, `/?authError=google_failed${returnHash}`, [clearState]);
+      }
+
+      const profile = await userInfoRes.json();
+      const user = upsertOAuthUser({
+        provider: 'google',
+        providerId: String(profile.sub),
+        name: profile.name || profile.given_name || profile.email,
+        email: profile.email || '',
+        avatarUrl: profile.picture || '',
+      });
+
+      const sessionToken = signPayload({
+        uid: user.id,
+        exp: Date.now() + SESSION_MAX_AGE_SEC * 1000,
+      });
+      const sessionCookie = serializeCookie(SESSION_COOKIE, sessionToken, {
+        maxAge: SESSION_MAX_AGE_SEC,
+        secure,
+      });
+
+      return redirect(res, `/${returnHash}`, [clearState, sessionCookie]);
+    }
+
+    /* بدء تسجيل الدخول عبر LinkedIn (OpenID Connect) */
+    if (pathname === '/auth/linkedin' && req.method === 'GET') {
+      const returnHash = sanitizeReturnHash(reqUrl.searchParams.get('returnTo'));
+      if (!hasLinkedInAuth) {
+        return redirect(res, `/?authError=linkedin_not_configured${returnHash}`);
+      }
+      const nonce = crypto.randomBytes(16).toString('hex');
+      const stateToken = signPayload({
+        provider: 'linkedin',
+        nonce,
+        returnHash,
+        exp: Date.now() + 10 * 60 * 1000,
+      });
+      const stateCookie = serializeCookie(OAUTH_STATE_COOKIE, stateToken, {
+        maxAge: 600,
+        secure,
+      });
+      const params = new URLSearchParams({
+        response_type: 'code',
+        client_id: LINKEDIN_CLIENT_ID,
+        redirect_uri: `${origin}/auth/linkedin/callback`,
+        scope: 'openid profile email',
+        state: nonce,
+      });
+      return redirect(
+        res,
+        `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`,
+        [stateCookie]
+      );
+    }
+
+    /* استقبال رد LinkedIn OAuth */
+    if (pathname === '/auth/linkedin/callback' && req.method === 'GET') {
+      const cookies = parseCookies(req);
+      const savedState = verifySignedToken(cookies[OAUTH_STATE_COOKIE]);
+      const clearState = serializeCookie(OAUTH_STATE_COOKIE, '', { maxAge: 0, secure });
+      const returnHash = sanitizeReturnHash(savedState?.returnHash);
+
+      const code = reqUrl.searchParams.get('code');
+      const stateParam = reqUrl.searchParams.get('state');
+      if (!hasLinkedInAuth || !code || !savedState || savedState.provider !== 'linkedin' || savedState.nonce !== stateParam) {
+        return redirect(res, `/?authError=linkedin_failed${returnHash}`, [clearState]);
+      }
+
+      const tokenRes = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: `${origin}/auth/linkedin/callback`,
+          client_id: LINKEDIN_CLIENT_ID,
+          client_secret: LINKEDIN_CLIENT_SECRET,
+        }),
+      });
+
+      if (!tokenRes.ok) {
+        console.error('LinkedIn token exchange failed:', await tokenRes.text());
+        return redirect(res, `/?authError=linkedin_failed${returnHash}`, [clearState]);
+      }
+
+      const tokenData = await tokenRes.json();
+      const userInfoRes = await fetch('https://api.linkedin.com/v2/userinfo', {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+
+      if (!userInfoRes.ok) {
+        console.error('LinkedIn userinfo failed:', await userInfoRes.text());
+        return redirect(res, `/?authError=linkedin_failed${returnHash}`, [clearState]);
+      }
+
+      const profile = await userInfoRes.json();
+      const fullName =
+        profile.name ||
+        [profile.given_name, profile.family_name].filter(Boolean).join(' ') ||
+        profile.email;
+
+      const user = upsertOAuthUser({
+        provider: 'linkedin',
+        providerId: String(profile.sub),
+        name: fullName,
+        email: profile.email || '',
+        avatarUrl: profile.picture || '',
+      });
+
+      const sessionToken = signPayload({
+        uid: user.id,
+        exp: Date.now() + SESSION_MAX_AGE_SEC * 1000,
+      });
+      const sessionCookie = serializeCookie(SESSION_COOKIE, sessionToken, {
+        maxAge: SESSION_MAX_AGE_SEC,
+        secure,
+      });
+
+      return redirect(res, `/${returnHash}`, [clearState, sessionCookie]);
+    }
+
     /* 1. فحص الصحة لـ Railway */
     if (pathname === '/api/health' && req.method === 'GET') {
       const totalScores = db.prepare('SELECT COUNT(*) AS count FROM scores').get().count;
@@ -410,6 +936,7 @@ const server = http.createServer(async (req, res) => {
         ok: true,
         service: 'accessibility-game',
         scoresCount: totalScores,
+        providers: { google: hasGoogleAuth, linkedin: hasLinkedInAuth },
       });
     }
 
@@ -429,8 +956,15 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, result);
     }
 
-    /* 4. واجهة لوحة الصدارة (إضافة نتيجة محور للاعب) */
+    /* 4. واجهة لوحة الصدارة (إضافة نتيجة محور للاعب المسجّل عبر Google أو LinkedIn) */
     if (pathname === '/api/leaderboard' && req.method === 'POST') {
+      const sessionUser = getSessionUser(req);
+      if (!sessionUser) {
+        return sendJson(res, 401, {
+          error: 'يجب تسجيل الدخول عبر LinkedIn أو Google أولاً لحفظ نتيجتك في لوحة الصدارة.',
+        });
+      }
+
       const ip = getClientIp(req);
       if (isRateLimited(ip)) {
         return sendJson(res, 429, { error: 'تم تجاوز الحد المسموح مؤقتاً، حاول بعد دقيقة.' });
@@ -444,7 +978,6 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, status, { error: 'بيانات الطلب غير صالحة.' });
       }
 
-      const name = typeof body.name === 'string' ? body.name.trim() : '';
       const topicId = typeof body.topicId === 'string' ? body.topicId.trim().slice(0, 60) : '';
       const topic = typeof body.topic === 'string' ? body.topic.trim().slice(0, 60) : 'تحدّي شامل';
       const accuracy = Math.round(Number(body.accuracy));
@@ -452,9 +985,6 @@ const server = http.createServer(async (req, res) => {
       const durationSeconds = Math.round(Number(body.durationSeconds ?? 60));
       const score = Math.round(Number(body.score ?? 0));
 
-      if (name.length < 2 || name.length > 30) {
-        return sendJson(res, 400, { error: 'يجب أن يكون الاسم بين حرفين و30 حرفاً.' });
-      }
       if (!Number.isFinite(accuracy) || accuracy < 0 || accuracy > 100) {
         return sendJson(res, 400, { error: 'قيمة الدقة غير صالحة.' });
       }
@@ -468,12 +998,32 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 400, { error: 'قيمة النقاط غير صالحة.' });
       }
 
+      /* منع التكرار لنفس المستخدم ونفس المحور خلال آخر 30 يوماً */
+      const recentSameTopic = db
+        .prepare(
+          `SELECT id FROM scores
+           WHERE user_id = ? AND topic_id = ? AND datetime(created_at) >= datetime('now', '-30 days')
+           LIMIT 1`
+        )
+        .get(sessionUser.id, topicId);
+
+      if (recentSameTopic) {
+        return sendJson(res, 200, {
+          id: recentSameTopic.id,
+          name: sessionUser.name,
+          topicId,
+          topic,
+          alreadySaved: true,
+        });
+      }
+
       const insert = db.prepare(
-        `INSERT INTO scores (name, topic_id, topic, accuracy, errors, duration_seconds, score)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO scores (user_id, name, topic_id, topic, accuracy, errors, duration_seconds, score)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       );
       const result = insert.run(
-        name,
+        sessionUser.id,
+        sessionUser.name,
         topicId,
         topic,
         accuracy,
@@ -484,7 +1034,7 @@ const server = http.createServer(async (req, res) => {
 
       return sendJson(res, 201, {
         id: Number(result.lastInsertRowid),
-        name,
+        name: sessionUser.name,
         topicId,
         topic,
         accuracy,
@@ -495,7 +1045,357 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
-    /* 5. تقديم الملفات الساكنة بأمان */
+    /* =====================================================================
+       5. واجهة غرف الفعاليات الجماعية (Kahoot / Slido Live Rooms)
+       ===================================================================== */
+
+    if (pathname === '/api/events/rooms' && req.method === 'POST') {
+      let body;
+      try {
+        body = await readJsonBody(req);
+      } catch {
+        return sendJson(res, 400, { error: 'بيانات إنشاء الغرفة غير صالحة.' });
+      }
+
+      const gameType = VALID_EVENT_GAMES.has(body.gameType) ? body.gameType : 'right-or-left';
+      const deck = sanitizeEventDeck(body.deck);
+      if (deck.length < 2) {
+        return sendJson(res, 400, { error: 'قائمة جولات الفعالية غير مكتملة.' });
+      }
+
+      const requestedRounds = Math.round(Number(body.totalRounds) || 10);
+      const totalRounds =
+        gameType === 'ten-in-a-row'
+          ? 10
+          : gameType === 'speed-blitz'
+            ? deck.length
+            : Math.max(3, Math.min(deck.length, requestedRounds));
+      const timerSeconds = Math.max(0, Math.min(120, Math.round(Number(body.timerSeconds) || 0)));
+
+      const code = generateRoomCode();
+      const hostToken = crypto.randomBytes(18).toString('hex');
+      const now = Date.now();
+      const room = {
+        code,
+        hostToken,
+        gameType,
+        status: 'lobby',
+        roundIndex: 0,
+        totalRounds,
+        streak: 0,
+        bestStreak: 0,
+        attemptNumber: 1,
+        streakFailed: false,
+        won: false,
+        timerSeconds,
+        roundStartedAt: null,
+        blitzEndsAt: null,
+        deck,
+        players: new Map(),
+        votes: new Map(),
+        lastOutcome: null,
+        groupCorrectTotal: 0,
+        clients: new Set(),
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      EVENT_ROOMS.set(code, room);
+      return sendJson(res, 201, {
+        code,
+        hostToken,
+        room: serializeEventRoom(room),
+      });
+    }
+
+    const eventRoomMatch = pathname.match(/^\/api\/events\/rooms\/(\d{6})(?:\/(stream|join|vote|action))?$/);
+    if (eventRoomMatch) {
+      const [, roomCode, subAction] = eventRoomMatch;
+      const room = EVENT_ROOMS.get(roomCode);
+      if (!room) {
+        return sendJson(res, 404, { error: 'لم يتم العثور على غرفة بهذا الرمز أو انتهت الجلسة.' });
+      }
+
+      /* قراءة حالة الغرفة */
+      if (!subAction && req.method === 'GET') {
+        return sendJson(res, 200, { room: serializeEventRoom(room) });
+      }
+
+      /* البث المباشر SSE */
+      if (subAction === 'stream' && req.method === 'GET') {
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream; charset=utf-8',
+          'Cache-Control': 'no-cache, no-transform',
+          Connection: 'keep-alive',
+          'X-Accel-Buffering': 'no',
+        });
+        res.write(`data: ${JSON.stringify(serializeEventRoom(room))}\n\n`);
+        room.clients.add(res);
+
+        const pingTimer = setInterval(() => {
+          try {
+            res.write(': ping\n\n');
+          } catch {
+            clearInterval(pingTimer);
+            room.clients.delete(res);
+          }
+        }, 25000);
+
+        req.on('close', () => {
+          clearInterval(pingTimer);
+          room.clients.delete(res);
+        });
+        return;
+      }
+
+      /* انضمام مشارك جديد للغرفة */
+      if (subAction === 'join' && req.method === 'POST') {
+        let body;
+        try {
+          body = await readJsonBody(req);
+        } catch {
+          return sendJson(res, 400, { error: 'بيانات الانضمام غير صالحة.' });
+        }
+        const rawName = typeof body.name === 'string' ? body.name.trim() : '';
+        if (rawName.length < 2 || rawName.length > 26) {
+          return sendJson(res, 400, { error: 'يرجى إدخال اسم من حرفين إلى 26 حرفاً.' });
+        }
+        if (room.players.size >= 250) {
+          return sendJson(res, 400, { error: 'الغرفة وصلت إلى الحد الأقصى من المشاركين.' });
+        }
+
+        const playerId = crypto.randomBytes(8).toString('hex');
+        room.players.set(playerId, {
+          id: playerId,
+          name: rawName,
+          score: 0,
+          correctCount: 0,
+          streak: 0,
+          joinedAt: Date.now(),
+        });
+        broadcastEventRoom(room);
+        return sendJson(res, 201, {
+          playerId,
+          name: rawName,
+          room: serializeEventRoom(room),
+        });
+      }
+
+      /* تسجيل تصويت مشارك (يمين / يسار) */
+      if (subAction === 'vote' && req.method === 'POST') {
+        let body;
+        try {
+          body = await readJsonBody(req);
+        } catch {
+          return sendJson(res, 400, { error: 'بيانات التصويت غير صالحة.' });
+        }
+        const playerId = typeof body.playerId === 'string' ? body.playerId : '';
+        const side = body.side === 'right' || body.side === 'left' ? body.side : null;
+        if (!side || !room.players.has(playerId)) {
+          return sendJson(res, 400, { error: 'تعذّر تسجيل الصوت — تأكد من انضمامك للغرفة.' });
+        }
+        if (room.status !== 'question') {
+          return sendJson(res, 409, { error: 'التصويت مغلق حالياً في هذه الجولة.' });
+        }
+
+        room.votes.set(playerId, { side, answeredAt: Date.now() });
+        broadcastEventRoom(room);
+        return sendJson(res, 200, { ok: true, side, votesCount: room.votes.size });
+      }
+
+      /* أوامر المنسّق (Host Controls) */
+      if (subAction === 'action' && req.method === 'POST') {
+        let body;
+        try {
+          body = await readJsonBody(req);
+        } catch {
+          return sendJson(res, 400, { error: 'طلب غير صالح.' });
+        }
+        if (!body.hostToken || body.hostToken !== room.hostToken) {
+          return sendJson(res, 403, { error: 'هذا الإجراء متاح لمنسّق الغرفة فقط.' });
+        }
+
+        const action = body.action;
+        const now = Date.now();
+
+        if (action === 'start') {
+          room.status = 'question';
+          room.roundIndex = 0;
+          room.streak = 0;
+          room.streakFailed = false;
+          room.won = false;
+          room.lastOutcome = null;
+          room.votes.clear();
+          room.roundStartedAt = now;
+          if (room.gameType === 'speed-blitz') {
+            room.blitzEndsAt = now + 60 * 1000;
+          }
+          broadcastEventRoom(room);
+          return sendJson(res, 200, { room: serializeEventRoom(room) });
+        }
+
+        if (action === 'reveal') {
+          if (room.status !== 'question') {
+            return sendJson(res, 200, { room: serializeEventRoom(room) });
+          }
+          const currentCard = room.deck[room.roundIndex];
+          if (!currentCard) {
+            room.status = 'finished';
+            broadcastEventRoom(room);
+            return sendJson(res, 200, { room: serializeEventRoom(room) });
+          }
+
+          let rightVotes = 0;
+          let leftVotes = 0;
+          for (const v of room.votes.values()) {
+            if (v.side === 'right') rightVotes += 1;
+            else if (v.side === 'left') leftVotes += 1;
+          }
+          const totalVotes = rightVotes + leftVotes;
+          const manualSide = body.manualSide === 'right' || body.manualSide === 'left' ? body.manualSide : null;
+
+          let groupChoice = 'none';
+          if (manualSide && totalVotes === 0) {
+            groupChoice = manualSide;
+          } else if (totalVotes > 0) {
+            if (rightVotes > leftVotes) groupChoice = 'right';
+            else if (leftVotes > rightVotes) groupChoice = 'left';
+            else groupChoice = manualSide || 'tie';
+          }
+
+          const isGroupCorrect = groupChoice === currentCard.goodSide;
+          const roundDurationWindow = Math.max(10, room.timerSeconds || 20) * 1000;
+
+          /* احتساب نقاط كاهوت لكل لاعب أصاب */
+          for (const [pid, player] of room.players.entries()) {
+            const vote = room.votes.get(pid);
+            if (vote && vote.side === currentCard.goodSide) {
+              const elapsed = Math.max(0, vote.answeredAt - (room.roundStartedAt || now));
+              const speedRatio = Math.max(0, Math.min(1, 1 - elapsed / roundDurationWindow));
+              const gained = 100 + Math.round(speedRatio * 100) + player.streak * 20;
+              player.score += gained;
+              player.correctCount += 1;
+              player.streak += 1;
+            } else {
+              player.streak = 0;
+            }
+          }
+
+          if (isGroupCorrect) {
+            room.groupCorrectTotal += 1;
+            room.streak += 1;
+            if (room.streak > room.bestStreak) room.bestStreak = room.streak;
+            room.streakFailed = false;
+          } else {
+            if (room.gameType === 'ten-in-a-row') {
+              room.streakFailed = true;
+            } else {
+              room.streak = 0;
+            }
+          }
+
+          room.lastOutcome = {
+            groupChoice,
+            goodSide: currentCard.goodSide,
+            isGroupCorrect,
+            rightVotes,
+            leftVotes,
+            totalVotes,
+            rightPct: totalVotes > 0 ? Math.round((rightVotes / totalVotes) * 100) : 0,
+            leftPct: totalVotes > 0 ? Math.round((leftVotes / totalVotes) * 100) : 0,
+          };
+
+          if (room.gameType === 'ten-in-a-row' && isGroupCorrect && room.streak >= 10) {
+            room.won = true;
+            room.status = 'finished';
+          } else {
+            room.status = 'revealed';
+          }
+
+          broadcastEventRoom(room);
+          return sendJson(res, 200, { room: serializeEventRoom(room) });
+        }
+
+        if (action === 'next') {
+          if (room.gameType === 'speed-blitz' && room.blitzEndsAt && now >= room.blitzEndsAt) {
+            room.status = 'finished';
+            broadcastEventRoom(room);
+            return sendJson(res, 200, { room: serializeEventRoom(room) });
+          }
+
+          const nextIdx = room.roundIndex + 1;
+          if (nextIdx >= room.totalRounds || nextIdx >= room.deck.length) {
+            room.status = 'finished';
+          } else {
+            room.roundIndex = nextIdx;
+            room.status = 'question';
+            room.votes.clear();
+            room.lastOutcome = null;
+            room.roundStartedAt = now;
+          }
+          broadcastEventRoom(room);
+          return sendJson(res, 200, { room: serializeEventRoom(room) });
+        }
+
+        if (action === 'reset-streak') {
+          const freshDeck = sanitizeEventDeck(body.deck);
+          if (freshDeck.length >= 10) {
+            room.deck = freshDeck;
+          }
+          room.attemptNumber += 1;
+          room.streak = 0;
+          room.streakFailed = false;
+          room.won = false;
+          room.roundIndex = 0;
+          room.votes.clear();
+          room.lastOutcome = null;
+          room.status = 'question';
+          room.roundStartedAt = now;
+          broadcastEventRoom(room);
+          return sendJson(res, 200, { room: serializeEventRoom(room) });
+        }
+
+        if (action === 'finish') {
+          room.status = 'finished';
+          broadcastEventRoom(room);
+          return sendJson(res, 200, { room: serializeEventRoom(room) });
+        }
+
+        if (action === 'restart') {
+          const freshDeck = sanitizeEventDeck(body.deck);
+          if (freshDeck.length >= 2) {
+            room.deck = freshDeck;
+          }
+          room.roundIndex = 0;
+          room.streak = 0;
+          room.streakFailed = false;
+          room.won = false;
+          room.groupCorrectTotal = 0;
+          room.attemptNumber = 1;
+          room.votes.clear();
+          room.lastOutcome = null;
+          room.blitzEndsAt = null;
+          for (const p of room.players.values()) {
+            p.score = 0;
+            p.correctCount = 0;
+            p.streak = 0;
+          }
+          room.status = 'question';
+          room.roundStartedAt = now;
+          if (room.gameType === 'speed-blitz') {
+            room.blitzEndsAt = now + 60 * 1000;
+          }
+          broadcastEventRoom(room);
+          return sendJson(res, 200, { room: serializeEventRoom(room) });
+        }
+
+        return sendJson(res, 400, { error: 'إجراء غير معروف.' });
+      }
+
+      return sendJson(res, 405, { error: 'Method Not Allowed' });
+    }
+
+    /* 6. تقديم الملفات الساكنة بأمان */
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' });
       return res.end('Method Not Allowed');
@@ -558,4 +1458,5 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, HOST, () => {
   console.log(`Accessibility Game server listening on http://${HOST}:${PORT}`);
   console.log(`Persistent storage directory: ${DATA_DIR}`);
+  console.log(`OAuth providers configured -> Google: ${hasGoogleAuth}, LinkedIn: ${hasLinkedInAuth}`);
 });

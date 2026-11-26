@@ -247,6 +247,7 @@
   const VIEW_LABELS = {
     home: 'الصفحة الرئيسية',
     challenges: 'صفحة التحديات',
+    events: 'الفعاليات الجماعية',
     play: 'ساحة التحدّي',
     blog: 'المقالات',
     leaderboard: 'لوحة الصدارة',
@@ -433,6 +434,9 @@
 
   const menuToggleBtn = document.getElementById('menu-toggle');
   const primaryNav = document.getElementById('primary-nav');
+  const headerAuthEl = document.getElementById('header-auth');
+  const breadcrumbBar = document.getElementById('breadcrumb-bar');
+  const breadcrumbList = document.getElementById('breadcrumb-list');
 
   const topicsGrid = document.getElementById('topics-grid');
   const challengesGrid = document.getElementById('challenges-grid');
@@ -475,6 +479,151 @@
   let lastFocusedBeforeDialog = null;
   let lastFocusedArticleTrigger = null;
   let activeCooldownTimerId = null;
+
+  /* حالة المصادقة (Google / LinkedIn) */
+  let currentUser = null;
+  let authLoaded = false;
+  let authProviders = { google: false, linkedin: false };
+  let authErrorCode = '';
+
+  const AUTH_ERROR_MESSAGES = {
+    google_not_configured:
+      'تسجيل الدخول بحساب Google غير مفعّل بعد على الخادم (يتطلب إضافة GOOGLE_CLIENT_ID و GOOGLE_CLIENT_SECRET في إعدادات Railway).',
+    linkedin_not_configured:
+      'تسجيل الدخول عبر LinkedIn غير مفعّل بعد على الخادم (يتطلب إضافة LINKEDIN_CLIENT_ID و LINKEDIN_CLIENT_SECRET في إعدادات Railway).',
+    google_failed: 'تعذّر إتمام تسجيل الدخول عبر Google. يرجى المحاولة مرة أخرى.',
+    linkedin_failed: 'تعذّر إتمام تسجيل الدخول عبر LinkedIn. يرجى المحاولة مرة أخرى.',
+  };
+
+  function readAndClearAuthError() {
+    const params = new URLSearchParams(window.location.search);
+    const isLocalHost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    if (isLocalHost && params.get('reset') === '1') {
+      try {
+        localStorage.removeItem(PROGRESS_STORAGE_KEY);
+        localStorage.removeItem(PLAYER_NAME_STORAGE_KEY);
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        /* تجاهل أخطاء التخزين */
+      }
+      history.replaceState(null, '', `${window.location.pathname}#challenges`);
+      return;
+    }
+    const err = params.get('authError') || '';
+    if (err) {
+      authErrorCode = err;
+      const cleanUrl = `${window.location.pathname}${window.location.hash}`;
+      history.replaceState(null, '', cleanUrl);
+    }
+  }
+
+  function buildOAuthButtonsHtml(returnHash) {
+    const encodedReturn = encodeURIComponent(returnHash || window.location.hash || '#challenges');
+    return `
+      <div class="oauth-buttons">
+        <a href="/auth/linkedin?returnTo=${encodedReturn}" class="oauth-btn oauth-btn-linkedin">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M4.98 3.5A2.5 2.5 0 1 1 5 8.5a2.5 2.5 0 0 1-.02-5ZM3 9h4v12H3V9Zm7 0h3.8v1.65h.05c.53-1 1.83-2.05 3.77-2.05C21.65 8.6 22 11.1 22 14.35V21h-4v-5.85c0-1.4-.03-3.2-1.95-3.2-1.95 0-2.25 1.52-2.25 3.1V21h-4V9Z"/>
+          </svg>
+          <span>المتابعة عبر LinkedIn</span>
+        </a>
+        <a href="/auth/google?returnTo=${encodedReturn}" class="oauth-btn oauth-btn-google">
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="#EA4335" d="M12 10.2v3.9h5.45c-.24 1.26-.96 2.33-2.04 3.04l3.3 2.56c1.92-1.77 3.03-4.38 3.03-7.48 0-.72-.06-1.41-.19-2.02H12Z"/>
+            <path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.62-2.44l-3.3-2.56c-.91.61-2.08.98-3.32.98-2.56 0-4.73-1.73-5.51-4.05H3.09v2.64A10 10 0 0 0 12 22Z"/>
+            <path fill="#FBBC05" d="M6.49 13.93a6.03 6.03 0 0 1 0-3.86V7.43H3.09a10 10 0 0 0 0 9.14l3.4-2.64Z"/>
+            <path fill="#4285F4" d="M12 6.02c1.47 0 2.79.5 3.83 1.5l2.87-2.87C16.95 2.98 14.7 2 12 2a10 10 0 0 0-8.91 5.43l3.4 2.64c.78-2.32 2.95-4.05 5.51-4.05Z"/>
+          </svg>
+          <span>المتابعة عبر حساب Google</span>
+        </a>
+      </div>
+    `;
+  }
+
+  function openSignInDialog() {
+    const returnHash = window.location.hash || '#challenges';
+    const errorHtml =
+      authErrorCode && AUTH_ERROR_MESSAGES[authErrorCode]
+        ? `<div class="auth-alert" role="alert"><p>${escapeHtml(AUTH_ERROR_MESSAGES[authErrorCode])}</p></div>`
+        : '';
+
+    openDialog({
+      title: 'تسجيل الدخول',
+      desc: 'سجّل دخولك عبر LinkedIn أو حساب Google لحفظ نتائجك وإدراج اسمك تلقائياً في لوحة الصدارة (وفق معيار المصادقة الميسّرة WCAG 3.3.8).',
+      richHtml: `${errorHtml}${buildOAuthButtonsHtml(returnHash)}`,
+      showLeaderboardAction: false,
+    });
+  }
+
+  function renderHeaderAuth() {
+    if (!headerAuthEl) return;
+
+    if (currentUser) {
+      const initial = escapeHtml((currentUser.name || 'م').trim().charAt(0));
+      const avatarHtml =
+        currentUser.avatarUrl && isSafeHttpUrl(currentUser.avatarUrl)
+          ? `<img src="${escapeHtml(currentUser.avatarUrl)}" alt="" class="user-avatar" referrerpolicy="no-referrer">`
+          : `<span class="user-avatar" aria-hidden="true">${initial}</span>`;
+
+      headerAuthEl.innerHTML = `
+        <div class="user-chip">
+          ${avatarHtml}
+          <span class="user-chip-name">${escapeHtml(currentUser.name)}</span>
+          <button type="button" class="user-logout-btn" id="header-logout-btn">خروج</button>
+        </div>
+      `;
+
+      const logoutBtn = headerAuthEl.querySelector('#header-logout-btn');
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+          try {
+            await fetch('/api/auth/logout', { method: 'POST' });
+          } catch {
+            /* تجاهل أخطاء الشبكة */
+          }
+          currentUser = null;
+          renderHeaderAuth();
+          if (window.location.hash.startsWith('#play/')) {
+            syncViewFromHash();
+          }
+          announce('تم تسجيل الخروج بنجاح');
+        });
+      }
+      return;
+    }
+
+    headerAuthEl.innerHTML = `
+      <button type="button" class="header-login-btn" id="header-login-btn">تسجيل الدخول</button>
+    `;
+    const loginBtn = headerAuthEl.querySelector('#header-login-btn');
+    if (loginBtn) {
+      loginBtn.addEventListener('click', openSignInDialog);
+    }
+  }
+
+  async function loadAuthState() {
+    readAndClearAuthError();
+    try {
+      const response = await fetch('/api/auth/me', { cache: 'no-store' });
+      if (response.ok) {
+        const data = await response.json();
+        currentUser = data.user || null;
+        if (data.providers) {
+          authProviders = data.providers;
+        }
+      }
+    } catch {
+      /* عند التشغيل بدون خادم */
+    } finally {
+      authLoaded = true;
+      renderHeaderAuth();
+      if (window.location.hash.startsWith('#play/')) {
+        syncViewFromHash();
+      } else if (authErrorCode && AUTH_ERROR_MESSAGES[authErrorCode]) {
+        openSignInDialog();
+      }
+    }
+  }
 
   function clearCooldownTimer() {
     if (activeCooldownTimerId !== null) {
@@ -669,11 +818,73 @@
     });
   }
 
-  /* التنقل بين الصفحات (الرئيسية / التحديات / ساحة اللعب / المقالات / لوحة الصدارة) */
-  function setActiveView(viewName, { updateHash = true, moveFocus = false, articleSlug = null, topicId = null } = {}) {
+  /* تحديث مسار التنقل (Breadcrumbs — WCAG 2.4.8 Location) */
+  function renderBreadcrumbs(items) {
+    if (!breadcrumbBar || !breadcrumbList) return;
+    if (!Array.isArray(items) || items.length <= 1) {
+      breadcrumbBar.hidden = true;
+      breadcrumbList.innerHTML = '';
+      return;
+    }
+
+    breadcrumbList.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+
+    items.forEach((item, index) => {
+      const isLast = index === items.length - 1;
+      const li = document.createElement('li');
+      li.className = 'breadcrumb-item';
+
+      if (index > 0) {
+        const sep = document.createElement('span');
+        sep.className = 'breadcrumb-sep';
+        sep.setAttribute('aria-hidden', 'true');
+        sep.textContent = '‹';
+        li.appendChild(sep);
+      }
+
+      if (isLast) {
+        const span = document.createElement('span');
+        span.className = 'breadcrumb-current';
+        span.setAttribute('aria-current', 'page');
+        span.textContent = item.label;
+        li.appendChild(span);
+      } else {
+        const a = document.createElement('a');
+        a.className = 'breadcrumb-link';
+        a.href = item.href || '#home';
+        a.textContent = item.label;
+        a.addEventListener('click', (event) => {
+          event.preventDefault();
+          setActiveView(item.view, {
+            updateHash: true,
+            moveFocus: true,
+            articleSlug: item.articleSlug || null,
+            topicId: item.topicId || null,
+          });
+        });
+        li.appendChild(a);
+      }
+
+      fragment.appendChild(li);
+    });
+
+    breadcrumbList.appendChild(fragment);
+    breadcrumbBar.hidden = false;
+  }
+
+  /* التنقل بين الصفحات (الرئيسية / التحديات / الفعاليات / ساحة اللعب / المقالات / لوحة الصدارة) */
+  function setActiveView(
+    viewName,
+    { updateHash = true, moveFocus = false, articleSlug = null, topicId = null, eventSubPath = '' } = {}
+  ) {
     clearCooldownTimer();
-    const validViews = ['home', 'challenges', 'play', 'blog', 'leaderboard'];
+    const validViews = ['home', 'challenges', 'events', 'play', 'blog', 'leaderboard'];
     const targetView = validViews.includes(viewName) ? viewName : 'home';
+
+    if (targetView !== 'events' && window.EventsModule && typeof window.EventsModule.cleanup === 'function') {
+      window.EventsModule.cleanup();
+    }
 
     viewSections.forEach((section) => {
       const isMatch = section.dataset.view === targetView;
@@ -694,6 +905,31 @@
       }
     });
 
+    if (targetView === 'home') {
+      renderBreadcrumbs([]);
+    } else if (targetView === 'challenges') {
+      renderBreadcrumbs([
+        { label: 'الرئيسية', view: 'home', href: '#home' },
+        { label: 'التحديات' },
+      ]);
+    } else if (targetView === 'leaderboard') {
+      renderBreadcrumbs([
+        { label: 'الرئيسية', view: 'home', href: '#home' },
+        { label: 'لوحة الصدارة' },
+      ]);
+    }
+
+    if (targetView === 'events') {
+      if (window.EventsModule && typeof window.EventsModule.openRoute === 'function') {
+        window.EventsModule.openRoute(eventSubPath);
+      } else {
+        renderBreadcrumbs([
+          { label: 'الرئيسية', view: 'home', href: '#home' },
+          { label: 'الفعاليات' },
+        ]);
+      }
+    }
+
     if (targetView === 'blog') {
       if (articleSlug) {
         showBlogArticle(articleSlug, { updateHash: false, moveFocus });
@@ -704,6 +940,11 @@
 
     if (targetView === 'play') {
       const topic = WCAG_TOPICS.find((t) => t.id === topicId) || WCAG_TOPICS[0];
+      renderBreadcrumbs([
+        { label: 'الرئيسية', view: 'home', href: '#home' },
+        { label: 'التحديات', view: 'challenges', href: '#challenges' },
+        { label: `محور ${topic.ar}` },
+      ]);
       renderPlayArena(topic);
       topicId = topic.id;
     }
@@ -712,6 +953,7 @@
       let nextHash = `#${targetView}`;
       if (targetView === 'blog' && articleSlug) nextHash = `#blog/${articleSlug}`;
       if (targetView === 'play' && topicId) nextHash = `#play/${topicId}`;
+      if (targetView === 'events' && eventSubPath) nextHash = `#events/${eventSubPath}`;
       if (window.location.hash !== nextHash) {
         history.pushState(null, '', nextHash);
       }
@@ -737,6 +979,10 @@
     const hash = window.location.hash.replace('#', '');
     if (hash === 'challenges') {
       setActiveView('challenges', { updateHash: false });
+    } else if (hash === 'events') {
+      setActiveView('events', { updateHash: false, eventSubPath: '' });
+    } else if (hash.startsWith('events/')) {
+      setActiveView('events', { updateHash: false, eventSubPath: hash.slice('events/'.length) });
     } else if (hash.startsWith('play/')) {
       const topicId = hash.slice('play/'.length);
       const exists = WCAG_TOPICS.some((t) => t.id === topicId);
@@ -994,7 +1240,7 @@
     },
     privacy: {
       title: 'سياسة الخصوصية',
-      desc: 'نحترم خصوصيتك بالكامل؛ لا تجمع هذه اللعبة أي بيانات شخصية حساسة ولا تُرسل معلوماتك لخوادم خارجية. تُحفظ نتائجك ونقاطك في لوحة الصدارة محلياً على متصفحك فقط ويمكنك مسحها في أي وقت.',
+      desc: 'نلتزم بحماية خصوصيتك وشفافية التعامل مع بياناتك. عند تسجيل الدخول عبر LinkedIn أو Google، نستخدم بيانات ملفك الأساسي فقط (الاسم، البريد الإلكتروني، والصورة الشخصية) لإنشاء حسابك وعرض اسمك ونتائجك (عدد المحاور المكتملة، معدل الوقت، الدقة، والمحور الأبرز) في لوحة الصدارة على خوادم اللعبة، دون حفظ أي كلمات مرور ودون بيع بياناتك أو مشاركتها مع أي طرف ثالث. نستخدم ملف تعريف ارتباط آمن (Cookie) لإبقاء جلستك نشطة، والتخزين المحلي في متصفحك لحفظ تقدّمك المؤقت أثناء اللعب. يمكنك تسجيل الخروج في أي وقت أو التواصل معنا عبر LinkedIn لطلب حذف حسابك ونتائجك نهائياً.',
     },
     accessibility: {
       title: 'بيان الوصولية',
@@ -1411,7 +1657,11 @@
           nextBtn.focus();
           nextBtn.addEventListener('click', () => {
             if (isLast) {
-              renderTopicSummary(topic, challenges, updatedState);
+              if (currentUser) {
+                renderTopicSummary(topic, challenges, updatedState);
+              } else {
+                renderAuthGate(topic, challenges, updatedState);
+              }
             } else {
               renderChallengeRound(topic, challenges, updatedState);
               window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1455,9 +1705,62 @@
     ].join('\n');
   }
 
-  /* شاشة إتمام المحور وحفظ النتيجة والعدّاد التنازلي ومراجعة الأجوبة ومشاركة LinkedIn */
+  /* بوابة تسجيل الدخول الإلزامية قبل عرض النتيجة وإدراج الاسم في لوحة الصدارة */
+  function renderAuthGate(topic, challenges, rawState) {
+    clearCooldownTimer();
+
+    const state = rawState.completedAt
+      ? rawState
+      : saveTopicProgress(topic.id, { completedAt: Date.now() });
+
+    const returnHash = `#play/${topic.id}`;
+    const errorHtml =
+      authErrorCode && AUTH_ERROR_MESSAGES[authErrorCode]
+        ? `<div class="auth-alert" role="alert"><p>${escapeHtml(AUTH_ERROR_MESSAGES[authErrorCode])}</p></div>`
+        : '';
+
+    const setupHintHtml =
+      authLoaded && !authProviders.google && !authProviders.linkedin
+        ? `<p class="auth-provider-note">ملاحظة للمالك: لتفعيل الأزرار على الخادم، أضيفي مفاتيح <code>GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET</code> و <code>LINKEDIN_CLIENT_ID / LINKEDIN_CLIENT_SECRET</code> في متغيرات Railway.</p>`
+        : '';
+
+    playShellCard.innerHTML = `
+      <div class="auth-gate-card">
+        <span class="auth-gate-badge">أتممت جميع التحديات (${challenges.length} من ${challenges.length}) ✓</span>
+        <h2 class="auth-gate-title">سجّل دخولك لعرض نتيجتك وإدراج اسمك في لوحة الصدارة</h2>
+        <p class="auth-gate-desc">
+          حفظنا إجاباتك ووقتك في محور «${escapeHtml(topic.ar)}» بأمان! اختر تسجيل الدخول عبر <strong>LinkedIn</strong> أو <strong>حساب Google</strong> لعرض نتيجتك التفصيلية ومراجعة الأجوبة وإدراج اسمك تلقائياً في لوحة الصدارة.
+        </p>
+
+        ${errorHtml}
+        ${buildOAuthButtonsHtml(returnHash)}
+        ${setupHintHtml}
+
+        <div class="summary-actions">
+          <a href="#challenges" class="btn btn-secondary" id="gate-challenges-btn">العودة إلى التحديات</a>
+        </div>
+      </div>
+    `;
+
+    const backLink = playShellCard.querySelector('#gate-challenges-btn');
+    if (backLink) {
+      backLink.addEventListener('click', (event) => {
+        event.preventDefault();
+        setActiveView('challenges', { updateHash: true, moveFocus: true });
+      });
+    }
+
+    announce('أتممت التحديات! سجّل دخولك عبر LinkedIn أو Google لعرض نتيجتك وحفظها في لوحة الصدارة.');
+  }
+
+  /* شاشة إتمام المحور وحفظ النتيجة التلقائي باسم الحساب والعدّاد التنازلي ومراجعة الأجوبة ومشاركة LinkedIn */
   function renderTopicSummary(topic, challenges, rawState) {
     clearCooldownTimer();
+
+    if (!currentUser) {
+      renderAuthGate(topic, challenges, rawState);
+      return;
+    }
 
     /* ضمان وجود وقت الإتمام لبدء عدّاد الشهر (30 يوماً) */
     const state = rawState.completedAt
@@ -1471,7 +1774,8 @@
     const score = state.score || 0;
     const durationSeconds = Math.max(1, Math.round((state.elapsedMs || total * 12_000) / 1000));
     const rankTitle = getPerformanceTitle(accuracy);
-    const rememberedName = state.savedPlayerName || getSavedPlayerName();
+    const accountName = currentUser.name || state.savedPlayerName || '';
+    const providerLabel = currentUser.provider === 'linkedin' ? 'LinkedIn' : 'Google';
 
     const unlockAtMs = Number(state.completedAt) + REPLAY_COOLDOWN_MS;
     const initialRemainingMs = Math.max(0, unlockAtMs - Date.now());
@@ -1499,48 +1803,22 @@
       shareText
     )}`;
 
-    const leaderboardSectionHtml = state.savedToLeaderboard
-      ? `
-        <div class="play-ready-banner" role="status">
-          <strong>تم حفظ نتيجتك في لوحة الصدارة ✓</strong>
-          <p>
-            ${
-              rememberedName
-                ? `تم تسجيل نتيجتك في هذا المحور باسم «${escapeHtml(rememberedName)}» مسبقاً — لا حاجة لإدخال اسمك مرة أخرى.`
-                : 'تم تسجيل نتيجتك في هذا المحور مسبقاً — لا حاجة لإدخال اسمك مرة أخرى.'
-            }
-          </p>
-        </div>
-      `
-      : `
-        <form class="save-score-form" id="save-score-form">
-          <label for="player-nickname" class="save-score-label">
-            احفظ نتيجتك في لوحة الصدارة (اختياري):
-          </label>
-          <div class="save-score-row">
-            <input
-              type="text"
-              id="player-nickname"
-              name="nickname"
-              class="save-score-input"
-              placeholder="اكتب اسمك المستعار هنا..."
-              value="${escapeHtml(rememberedName)}"
-              minlength="2"
-              maxlength="30"
-              required
-              autocomplete="nickname"
-            >
-            <button
-              type="submit"
-              class="btn btn-primary"
-              id="save-score-submit"
-            >
-              حفظ النتيجة
-            </button>
-          </div>
-          <p id="save-score-feedback" class="save-score-feedback" aria-live="polite"></p>
-        </form>
-      `;
+    const leaderboardSectionHtml = `
+      <div class="play-ready-banner" id="auto-save-status-card" role="status">
+        <strong>${
+          state.savedToLeaderboard
+            ? 'تم إدراج نتيجتك في لوحة الصدارة ✓'
+            : 'جاري إدراج نتيجتك في لوحة الصدارة...'
+        }</strong>
+        <p id="auto-save-status-text">
+          ${
+            state.savedToLeaderboard
+              ? `تم تسجيل نتيجتك باسم «${escapeHtml(accountName)}» (عبر ${providerLabel}) تلقائياً في لوحة الصدارة.`
+              : `جاري حفظ نتيجتك باسم «${escapeHtml(accountName)}» (عبر ${providerLabel})...`
+          }
+        </p>
+      </div>
+    `;
 
     const initParts = getCountdownParts(initialRemainingMs);
     const cooldownCardHtml = isCooldownActive
@@ -1750,49 +2028,34 @@
       }, 1000);
     }
 
-    const form = playShellCard.querySelector('#save-score-form');
-    const nameInput = playShellCard.querySelector('#player-nickname');
-    const submitBtn = playShellCard.querySelector('#save-score-submit');
-    const formFeedback = playShellCard.querySelector('#save-score-feedback');
+    /* إدراج النتيجة تلقائياً في لوحة الصدارة باسم الحساب الموثّق (Google أو LinkedIn) */
+    if (!state.savedToLeaderboard && currentUser) {
+      const statusCard = playShellCard.querySelector('#auto-save-status-card');
+      const statusTitle = statusCard?.querySelector('strong');
+      const statusText = playShellCard.querySelector('#auto-save-status-text');
 
-    if (form && !state.savedToLeaderboard) {
-      form.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const nickname = nameInput.value.trim();
-        if (nickname.length < 2) {
-          formFeedback.textContent = 'يرجى كتابة اسم لا يقل عن حرفين.';
-          formFeedback.classList.add('is-error');
-          nameInput.focus();
-          return;
-        }
-
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'جاري الحفظ...';
-        formFeedback.classList.remove('is-error');
-
-        const result = await submitScoreToLeaderboard({
-          name: nickname,
-          topicId: topic.id,
-          topic: topic.ar,
-          accuracy,
-          errors,
-          durationSeconds,
-          score,
-        });
-
+      submitScoreToLeaderboard({
+        name: currentUser.name,
+        topicId: topic.id,
+        topic: topic.ar,
+        accuracy,
+        errors,
+        durationSeconds,
+        score,
+      }).then((result) => {
         if (result.ok) {
-          savePlayerName(nickname);
-          const updatedState = saveTopicProgress(topic.id, {
+          savePlayerName(currentUser.name);
+          saveTopicProgress(topic.id, {
             savedToLeaderboard: true,
-            savedPlayerName: nickname,
+            savedPlayerName: currentUser.name,
           });
-          renderTopicSummary(topic, challenges, updatedState);
-          announce('تم حفظ نتيجتك في لوحة الصدارة بنجاح');
-        } else {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'حفظ النتيجة';
-          formFeedback.textContent = result.error;
-          formFeedback.classList.add('is-error');
+          if (statusTitle) statusTitle.textContent = 'تم إدراج نتيجتك في لوحة الصدارة ✓';
+          if (statusText) {
+            statusText.textContent = `تم تسجيل نتيجتك باسم «${currentUser.name}» (عبر ${providerLabel}) تلقائياً في لوحة الصدارة.`;
+          }
+          announce('تم إدراج نتيجتك تلقائياً في لوحة الصدارة بنجاح');
+        } else if (statusText) {
+          statusText.textContent = result.error || 'تعذّر حفظ النتيجة حالياً.';
         }
       });
     }
@@ -1898,7 +2161,11 @@
 
     if (Array.isArray(topicChallenges) && topicChallenges.length > 0) {
       if (progress.finished) {
-        renderTopicSummary(topic, topicChallenges, progress);
+        if (currentUser) {
+          renderTopicSummary(topic, topicChallenges, progress);
+        } else {
+          renderAuthGate(topic, topicChallenges, progress);
+        }
       } else {
         renderChallengeRound(topic, topicChallenges, progress);
       }
@@ -2152,6 +2419,12 @@
     blogListContainer.hidden = true;
     blogReader.hidden = false;
 
+    renderBreadcrumbs([
+      { label: 'الرئيسية', view: 'home', href: '#home' },
+      { label: 'المقالات', view: 'blog', href: '#blog' },
+      { label: article.title },
+    ]);
+
     if (updateHash) {
       const nextHash = `#blog/${article.slug}`;
       if (window.location.hash !== nextHash) {
@@ -2176,6 +2449,11 @@
     if (!blogListContainer || !blogReader) return;
     blogReader.hidden = true;
     blogListContainer.hidden = false;
+
+    renderBreadcrumbs([
+      { label: 'الرئيسية', view: 'home', href: '#home' },
+      { label: 'المقالات' },
+    ]);
 
     if (updateHash) {
       if (window.location.hash !== '#blog') {
@@ -2278,10 +2556,20 @@
   }
 
   /* التهيئة الأولية */
+  if (window.EventsModule && typeof window.EventsModule.init === 'function') {
+    window.EventsModule.init({
+      container: document.getElementById('events-root'),
+      announce,
+      renderBreadcrumbs,
+    });
+  }
+  readAndClearAuthError();
+  renderHeaderAuth();
   renderTopics();
   renderChallenges();
   renderBlogList(activeBlogFilter);
   renderLeaderboard(activeFilter);
   syncViewFromHash();
   loadBlogArticles();
+  loadAuthState();
 })();
