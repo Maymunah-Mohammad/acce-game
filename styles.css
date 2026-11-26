@@ -1466,6 +1466,18 @@ body {
   border-color: var(--peach-border);
 }
 
+.player-name-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.player-medal {
+  display: inline-block;
+  font-size: 1.15em;
+  line-height: 1;
+}
+
 .player-name {
   font-weight: 700;
   color: var(--ink-primary);

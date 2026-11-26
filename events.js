@@ -1546,7 +1546,7 @@
         (p, idx) => `
           <tr>
             <td class="cell-rank" data-label="المركز">#${idx + 1}</td>
-            <td class="cell-player" data-label="المشارك / الفريق"><strong>${escapeHtml(p.name)}</strong></td>
+            <td class="cell-player" data-label="المشارك / الفريق"><span class="player-name-wrap">${idx < 3 ? `<span class="player-medal" aria-hidden="true">${medals[idx]}</span>` : ''}<strong>${escapeHtml(p.name)}</strong></span></td>
             <td data-label="النقاط">${p.score}</td>
             <td data-label="إجابات صحيحة">${p.correctCount}</td>
           </tr>

@@ -1180,6 +1180,10 @@
     entries.forEach((entry, index) => {
       const rank = index + 1;
       const rankClass = rank <= 3 ? `rank-${rank}` : '';
+      const topMedals = { 1: '🥇', 2: '🥈', 3: '🥉' };
+      const medalHtml = topMedals[rank]
+        ? `<span class="player-medal" aria-hidden="true">${topMedals[rank]}</span>`
+        : '';
       const topicsDone = Number(entry.topicsCompleted || 1);
       const avgTime = formatDurationAr(entry.avgDurationSeconds || 60);
       const bestTopicName = entry.bestTopic || entry.topic || '—';
@@ -1192,7 +1196,7 @@
       if (rank <= 3) tr.className = `is-top-rank top-rank-${rank}`;
       tr.innerHTML = `
         <td class="cell-rank" data-label="المركز"><span class="rank-badge ${rankClass}">${rank}</span></td>
-        <td class="player-name cell-player" data-label="اللاعب">${escapeHtml(entry.name)}</td>
+        <td class="player-name cell-player" data-label="اللاعب"><span class="player-name-wrap">${medalHtml}<span>${escapeHtml(entry.name)}</span></span></td>
         <td data-label="المحاور المكتملة"><span class="topics-done-pill">${escapeHtml(formatTopicsCompletedAr(topicsDone))} من 10</span></td>
         <td class="time-cell" data-label="معدل الوقت">${escapeHtml(avgTime)}</td>
         <td class="cell-best-topic" data-label="المحور الأبرز">
