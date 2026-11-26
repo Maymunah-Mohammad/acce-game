@@ -1545,10 +1545,10 @@
       .map(
         (p, idx) => `
           <tr>
-            <td>#${idx + 1}</td>
-            <td><strong>${escapeHtml(p.name)}</strong></td>
-            <td>${p.score}</td>
-            <td>${p.correctCount}</td>
+            <td class="cell-rank" data-label="المركز">#${idx + 1}</td>
+            <td class="cell-player" data-label="المشارك / الفريق"><strong>${escapeHtml(p.name)}</strong></td>
+            <td data-label="النقاط">${p.score}</td>
+            <td data-label="إجابات صحيحة">${p.correctCount}</td>
           </tr>
         `
       )

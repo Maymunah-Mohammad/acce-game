@@ -1189,18 +1189,19 @@
       const accuracyVal = Number(entry.avgAccuracy ?? entry.accuracy ?? 0);
 
       const tr = document.createElement('tr');
+      if (rank <= 3) tr.className = `is-top-rank top-rank-${rank}`;
       tr.innerHTML = `
-        <td><span class="rank-badge ${rankClass}">${rank}</span></td>
-        <td class="player-name">${escapeHtml(entry.name)}</td>
-        <td><span class="topics-done-pill">${escapeHtml(formatTopicsCompletedAr(topicsDone))} من 10</span></td>
-        <td class="time-cell">${escapeHtml(avgTime)}</td>
-        <td>
+        <td class="cell-rank" data-label="المركز"><span class="rank-badge ${rankClass}">${rank}</span></td>
+        <td class="player-name cell-player" data-label="اللاعب">${escapeHtml(entry.name)}</td>
+        <td data-label="المحاور المكتملة"><span class="topics-done-pill">${escapeHtml(formatTopicsCompletedAr(topicsDone))} من 10</span></td>
+        <td class="time-cell" data-label="معدل الوقت">${escapeHtml(avgTime)}</td>
+        <td class="cell-best-topic" data-label="المحور الأبرز">
           <div class="best-topic-cell">
             <span class="best-topic-name">${escapeHtml(bestTopicName)}</span>
             <span class="best-topic-meta">${escapeHtml(bestMeta)}</span>
           </div>
         </td>
-        <td><span class="accuracy-pill">${accuracyVal}%</span></td>
+        <td data-label="الدقة"><span class="accuracy-pill">${accuracyVal}%</span></td>
       `;
       leaderboardBody.appendChild(tr);
     });
