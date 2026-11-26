@@ -3,7 +3,8 @@
  * خادم Node.js خفيف ومهيأ للنشر على Railway بدون أي مكتبات خارجية.
  * - يقدّم ملفات الموقع الساكنة ومجلدات الصور بأمان.
  * - يدير قاعدة بيانات SQLite (node:sqlite) للوحة الصدارة في مجلد التخزين الدائم (DATA_DIR أو /data).
- * - يقدّم واجهة API للمقالات (/api/blog) ولوحة الصدارة (/api/leaderboard) وفحص الصحة (/api/health).
+ * - يرتّب لوحة الصدارة حسب: عدد المحاور المكتملة (الأكثر أفضل) ثم معدل الوقت المستغرق (الأقصر أفضل)،
+ *   ويحسب «المحور الأبرز» لكل لاعب باعتباره المحور الأقل أخطاءً والأسرع إتماماً.
  */
 
 import http from 'node:http';
@@ -32,37 +33,86 @@ if (!existsSync(RUNTIME_BLOG_PATH) && existsSync(SEED_BLOG_PATH)) {
   copyFileSync(SEED_BLOG_PATH, RUNTIME_BLOG_PATH);
 }
 
-/* تهيئة قاعدة بيانات SQLite للوحة الصدارة */
+/* تهيئة وترقية قاعدة بيانات SQLite للوحة الصدارة دون فقدان أي بيانات سابقة */
 const db = new DatabaseSync(DB_PATH);
 db.exec(`
   CREATE TABLE IF NOT EXISTS scores (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
+    topic_id TEXT NOT NULL DEFAULT '',
     topic TEXT NOT NULL,
     accuracy INTEGER NOT NULL CHECK (accuracy >= 0 AND accuracy <= 100),
-    score INTEGER NOT NULL CHECK (score >= 0 AND score <= 10000),
+    errors INTEGER NOT NULL DEFAULT 0 CHECK (errors >= 0 AND errors <= 100),
+    duration_seconds INTEGER NOT NULL DEFAULT 90 CHECK (duration_seconds >= 1 AND duration_seconds <= 7200),
+    score INTEGER NOT NULL DEFAULT 0 CHECK (score >= 0 AND score <= 10000),
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
-  CREATE INDEX IF NOT EXISTS idx_scores_rank ON scores (score DESC, accuracy DESC, created_at ASC);
 `);
 
-const SEED_SCORES = [
-  { name: 'سارة العتيبي', topic: 'الألوان والمظهر', accuracy: 98, score: 4250, daysAgo: 1 },
-  { name: 'خالد الحربي', topic: 'التركيز التفاعلي', accuracy: 96, score: 3980, daysAgo: 2 },
-  { name: 'نورة القحطاني', topic: 'النماذج وتقليل العوائق', accuracy: 95, score: 3820, daysAgo: 10 },
-  { name: 'عبدالله الشمري', topic: 'التنقل وقابلية التنبؤ', accuracy: 92, score: 3610, daysAgo: 3 },
-  { name: 'ريم الدوسري', topic: 'الطباعة والقراءة', accuracy: 90, score: 3440, daysAgo: 12 },
-  { name: 'فيصل الزهراني', topic: 'التخطيط والبنية', accuracy: 88, score: 3190, daysAgo: 4 },
+const columns = new Set(
+  db.prepare('PRAGMA table_info(scores)').all().map((col) => col.name)
+);
+
+if (!columns.has('topic_id')) {
+  db.exec(`ALTER TABLE scores ADD COLUMN topic_id TEXT NOT NULL DEFAULT ''`);
+}
+if (!columns.has('errors')) {
+  db.exec(`ALTER TABLE scores ADD COLUMN errors INTEGER NOT NULL DEFAULT 0`);
+}
+if (!columns.has('duration_seconds')) {
+  db.exec(`ALTER TABLE scores ADD COLUMN duration_seconds INTEGER NOT NULL DEFAULT 90`);
+}
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_scores_player ON scores (name, topic);
+`);
+
+const SEED_ATTEMPTS = [
+  /* سارة العتيبي — 4 محاور مكتملة، الأبرز: الألوان والمظهر (0 أخطاء، 48 ث) */
+  { name: 'سارة العتيبي', topicId: 'color-appearance', topic: 'الألوان والمظهر', accuracy: 100, errors: 0, durationSeconds: 48, score: 440, daysAgo: 1 },
+  { name: 'سارة العتيبي', topicId: 'navigation-predictability', topic: 'التنقل وقابلية التنبؤ', accuracy: 100, errors: 0, durationSeconds: 92, score: 1040, daysAgo: 1 },
+  { name: 'سارة العتيبي', topicId: 'interactive-focus', topic: 'التركيز التفاعلي', accuracy: 86, errors: 1, durationSeconds: 84, score: 660, daysAgo: 2 },
+  { name: 'سارة العتيبي', topicId: 'touch-targets', topic: 'اللمس وأحجام الأهداف', accuracy: 100, errors: 0, durationSeconds: 56, score: 220, daysAgo: 2 },
+
+  /* خالد الحربي — 3 محاور مكتملة، الأبرز: التركيز التفاعلي (0 أخطاء، 62 ث) */
+  { name: 'خالد الحربي', topicId: 'interactive-focus', topic: 'التركيز التفاعلي', accuracy: 100, errors: 0, durationSeconds: 62, score: 800, daysAgo: 2 },
+  { name: 'خالد الحربي', topicId: 'navigation-predictability', topic: 'التنقل وقابلية التنبؤ', accuracy: 89, errors: 1, durationSeconds: 88, score: 900, daysAgo: 2 },
+  { name: 'خالد الحربي', topicId: 'forms-friction', topic: 'النماذج وتقليل العوائق', accuracy: 100, errors: 0, durationSeconds: 72, score: 680, daysAgo: 3 },
+
+  /* نورة القحطاني — 3 محاور مكتملة، وقت أطول قليلاً من خالد */
+  { name: 'نورة القحطاني', topicId: 'forms-friction', topic: 'النماذج وتقليل العوائق', accuracy: 100, errors: 0, durationSeconds: 70, score: 680, daysAgo: 9 },
+  { name: 'نورة القحطاني', topicId: 'navigation-predictability', topic: 'التنقل وقابلية التنبؤ', accuracy: 89, errors: 1, durationSeconds: 104, score: 880, daysAgo: 9 },
+  { name: 'نورة القحطاني', topicId: 'typography-reading', topic: 'الطباعة والقراءة', accuracy: 100, errors: 0, durationSeconds: 82, score: 440, daysAgo: 10 },
+
+  /* عبدالله الشمري — محوران */
+  { name: 'عبدالله الشمري', topicId: 'navigation-predictability', topic: 'التنقل وقابلية التنبؤ', accuracy: 89, errors: 1, durationSeconds: 78, score: 900, daysAgo: 3 },
+  { name: 'عبدالله الشمري', topicId: 'layout-structure', topic: 'التخطيط والبنية', accuracy: 100, errors: 0, durationSeconds: 54, score: 340, daysAgo: 3 },
+
+  /* ريم الدوسري — محوران */
+  { name: 'ريم الدوسري', topicId: 'typography-reading', topic: 'الطباعة والقراءة', accuracy: 100, errors: 0, durationSeconds: 68, score: 440, daysAgo: 11 },
+  { name: 'ريم الدوسري', topicId: 'media-images', topic: 'الوسائط والصور', accuracy: 67, errors: 1, durationSeconds: 96, score: 200, daysAgo: 12 },
+
+  /* فيصل الزهراني — محور واحد */
+  { name: 'فيصل الزهراني', topicId: 'layout-structure', topic: 'التخطيط والبنية', accuracy: 100, errors: 0, durationSeconds: 58, score: 340, daysAgo: 4 },
 ];
 
 const existingCount = db.prepare('SELECT COUNT(*) AS count FROM scores').get().count;
 if (existingCount === 0) {
   const insertSeed = db.prepare(
-    `INSERT INTO scores (name, topic, accuracy, score, created_at)
-     VALUES (?, ?, ?, ?, datetime('now', ?))`
+    `INSERT INTO scores (name, topic_id, topic, accuracy, errors, duration_seconds, score, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', ?))`
   );
-  for (const row of SEED_SCORES) {
-    insertSeed.run(row.name, row.topic, row.accuracy, row.score, `-${row.daysAgo} days`);
+  for (const row of SEED_ATTEMPTS) {
+    insertSeed.run(
+      row.name,
+      row.topicId,
+      row.topic,
+      row.accuracy,
+      row.errors,
+      row.durationSeconds,
+      row.score,
+      `-${row.daysAgo} days`
+    );
   }
 }
 
@@ -124,27 +174,122 @@ async function readJsonBody(req, maxBytes = 8192) {
   return raw ? JSON.parse(raw) : {};
 }
 
-function getLeaderboardRows(filter) {
-  let sql = `
-    SELECT
-      id,
-      name,
-      topic,
-      accuracy,
-      score,
-      created_at,
-      CASE WHEN datetime(created_at) >= datetime('now', '-7 days') THEN 'week' ELSE 'all' END AS period
-    FROM scores
-  `;
+function isBetterAttempt(candidate, currentBest) {
+  if (!currentBest) return true;
+  if (candidate.errors !== currentBest.errors) {
+    return candidate.errors < currentBest.errors;
+  }
+  if (candidate.duration_seconds !== currentBest.duration_seconds) {
+    return candidate.duration_seconds < currentBest.duration_seconds;
+  }
+  return candidate.accuracy > currentBest.accuracy;
+}
 
-  if (filter === 'week') {
-    sql += ` WHERE datetime(created_at) >= datetime('now', '-7 days')`;
-  } else if (filter === 'perfect') {
-    sql += ` WHERE accuracy >= 95`;
+function getAggregatedLeaderboard(filter = 'all') {
+  const rows = db
+    .prepare(
+      `SELECT
+         name,
+         topic_id,
+         topic,
+         accuracy,
+         errors,
+         duration_seconds,
+         score,
+         created_at,
+         CASE WHEN datetime(created_at) >= datetime('now', '-7 days') THEN 1 ELSE 0 END AS is_recent_week
+       FROM scores`
+    )
+    .all();
+
+  const playersMap = new Map();
+
+  for (const row of rows) {
+    const playerKey = String(row.name || '').trim().toLowerCase();
+    if (!playerKey) continue;
+
+    if (!playersMap.has(playerKey)) {
+      playersMap.set(playerKey, {
+        name: String(row.name).trim(),
+        topicsMap: new Map(),
+        isRecentWeek: false,
+        latestAt: row.created_at || '',
+      });
+    }
+
+    const player = playersMap.get(playerKey);
+    if (row.is_recent_week) player.isRecentWeek = true;
+    if ((row.created_at || '') > player.latestAt) {
+      player.latestAt = row.created_at || '';
+      player.name = String(row.name).trim();
+    }
+
+    const topicKey = (row.topic_id && row.topic_id.trim()) || String(row.topic || '').trim();
+    const existingBest = player.topicsMap.get(topicKey);
+    if (isBetterAttempt(row, existingBest)) {
+      player.topicsMap.set(topicKey, row);
+    }
   }
 
-  sql += ` ORDER BY score DESC, accuracy DESC, created_at ASC LIMIT 50`;
-  return db.prepare(sql).all();
+  const allPlayers = [];
+  for (const player of playersMap.values()) {
+    const bestAttempts = Array.from(player.topicsMap.values());
+    if (bestAttempts.length === 0) continue;
+
+    const topicsCompleted = bestAttempts.length;
+    const avgDurationSeconds = Math.round(
+      bestAttempts.reduce((sum, a) => sum + Number(a.duration_seconds || 0), 0) /
+        topicsCompleted
+    );
+    const avgAccuracy = Math.round(
+      bestAttempts.reduce((sum, a) => sum + Number(a.accuracy || 0), 0) /
+        topicsCompleted
+    );
+
+    /* المحور الأبرز: الأقل أخطاءً ثم الأقل وقتاً لإتمامه */
+    let standout = bestAttempts[0];
+    for (const attempt of bestAttempts) {
+      if (isBetterAttempt(attempt, standout)) {
+        standout = attempt;
+      }
+    }
+
+    allPlayers.push({
+      name: player.name,
+      topicsCompleted,
+      avgDurationSeconds,
+      avgAccuracy,
+      bestTopic: standout.topic,
+      bestTopicErrors: Number(standout.errors || 0),
+      bestTopicDurationSeconds: Number(standout.duration_seconds || 0),
+      period: player.isRecentWeek ? 'week' : 'all',
+      latestAt: player.latestAt,
+    });
+  }
+
+  /* الترتيب: الأكثر محاور أولاً، ثم الأقصر في معدل الوقت، ثم الأعلى دقة */
+  allPlayers.sort((a, b) => {
+    if (b.topicsCompleted !== a.topicsCompleted) {
+      return b.topicsCompleted - a.topicsCompleted;
+    }
+    if (a.avgDurationSeconds !== b.avgDurationSeconds) {
+      return a.avgDurationSeconds - b.avgDurationSeconds;
+    }
+    if (b.avgAccuracy !== a.avgAccuracy) {
+      return b.avgAccuracy - a.avgAccuracy;
+    }
+    return a.latestAt.localeCompare(b.latestAt);
+  });
+
+  const filtered = allPlayers
+    .filter((entry) => {
+      if (filter === 'week') return entry.period === 'week';
+      if (filter === 'perfect') return entry.avgAccuracy >= 95;
+      return true;
+    })
+    .slice(0, 50);
+
+  return { entries: filtered, total: allPlayers.length };
 }
 
 function getClientIp(req) {
@@ -179,15 +324,14 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, articles);
     }
 
-    /* 3. واجهة لوحة الصدارة (قراءة) */
+    /* 3. واجهة لوحة الصدارة (قراءة مجمّعة لكل لاعب) */
     if (pathname === '/api/leaderboard' && req.method === 'GET') {
       const filter = reqUrl.searchParams.get('filter') || 'all';
-      const rows = getLeaderboardRows(filter);
-      const total = db.prepare('SELECT COUNT(*) AS count FROM scores').get().count;
-      return sendJson(res, 200, { entries: rows, total });
+      const result = getAggregatedLeaderboard(filter);
+      return sendJson(res, 200, result);
     }
 
-    /* 4. واجهة لوحة الصدارة (إضافة نتيجة لاعب) */
+    /* 4. واجهة لوحة الصدارة (إضافة نتيجة محور للاعب) */
     if (pathname === '/api/leaderboard' && req.method === 'POST') {
       const ip = getClientIp(req);
       if (isRateLimited(ip)) {
@@ -203,9 +347,12 @@ const server = http.createServer(async (req, res) => {
       }
 
       const name = typeof body.name === 'string' ? body.name.trim() : '';
-      const topic = typeof body.topic === 'string' ? body.topic.trim() : 'تحدّي شامل';
+      const topicId = typeof body.topicId === 'string' ? body.topicId.trim().slice(0, 60) : '';
+      const topic = typeof body.topic === 'string' ? body.topic.trim().slice(0, 60) : 'تحدّي شامل';
       const accuracy = Math.round(Number(body.accuracy));
-      const score = Math.round(Number(body.score));
+      const errors = Math.round(Number(body.errors ?? 0));
+      const durationSeconds = Math.round(Number(body.durationSeconds ?? 60));
+      const score = Math.round(Number(body.score ?? 0));
 
       if (name.length < 2 || name.length > 30) {
         return sendJson(res, 400, { error: 'يجب أن يكون الاسم بين حرفين و30 حرفاً.' });
@@ -213,20 +360,38 @@ const server = http.createServer(async (req, res) => {
       if (!Number.isFinite(accuracy) || accuracy < 0 || accuracy > 100) {
         return sendJson(res, 400, { error: 'قيمة الدقة غير صالحة.' });
       }
+      if (!Number.isFinite(errors) || errors < 0 || errors > 100) {
+        return sendJson(res, 400, { error: 'قيمة الأخطاء غير صالحة.' });
+      }
+      if (!Number.isFinite(durationSeconds) || durationSeconds < 1 || durationSeconds > 7200) {
+        return sendJson(res, 400, { error: 'قيمة الوقت غير صالحة.' });
+      }
       if (!Number.isFinite(score) || score < 0 || score > 10000) {
         return sendJson(res, 400, { error: 'قيمة النقاط غير صالحة.' });
       }
 
       const insert = db.prepare(
-        'INSERT INTO scores (name, topic, accuracy, score) VALUES (?, ?, ?, ?)'
+        `INSERT INTO scores (name, topic_id, topic, accuracy, errors, duration_seconds, score)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
       );
-      const result = insert.run(name, topic.slice(0, 60), accuracy, score);
+      const result = insert.run(
+        name,
+        topicId,
+        topic,
+        accuracy,
+        errors,
+        durationSeconds,
+        score
+      );
 
       return sendJson(res, 201, {
         id: Number(result.lastInsertRowid),
         name,
-        topic: topic.slice(0, 60),
+        topicId,
+        topic,
         accuracy,
+        errors,
+        durationSeconds,
         score,
         period: 'week',
       });
