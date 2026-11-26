@@ -500,7 +500,7 @@
       <div class="event-choice-grid" role="group" aria-label="اختر الواجهة المتاحة: يمين أم يسار">
         ${sides
           .map((item) => {
-            const cropClass = item.isGood ? 'crop-good' : 'crop-bad';
+            const cropClass = item.isGood ? 'crop-top-left' : 'crop-top-right';
             const altText = item.isGood ? challenge.goodAlt : challenge.badAlt;
             let stateClass = '';
             let verdictPill = '';
