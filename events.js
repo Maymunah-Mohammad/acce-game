@@ -314,7 +314,7 @@
       badAlt: 'خريطة تفرض التكبير بإصبعين فقط دون أزرار مساعدة.',
     },
 
-    /* --- الحركة والرسوم المتحركة (1) --- */
+    /* --- الحركة والرسوم المتحركة (4) --- */
     {
       id: 'ev-pause-stop-hide',
       topicAr: 'الحركة والرسوم المتحركة',
@@ -325,6 +325,151 @@
       shortReason: 'وجود زر إيقاف مؤقت (❚❚) يمنع التشتيت ويتيح القراءة بهدوء لمن يتأثرون بالحركة.',
       goodAlt: 'لافتة عروض متحركة تحتوي على زر إيقاف مؤقت واضح.',
       badAlt: 'لافتة عروض تتحرك تلقائياً بشكل مستمر دون زر لإيقافها.',
+    },
+    {
+      id: 'ev-animation-interactions',
+      topicAr: 'الحركة والرسوم المتحركة',
+      wcagCode: '2.3.3',
+      criterionAr: 'تقليل الحركة من التفاعلات',
+      image: 'Animation & Motion/Animation from Interactions_1.jpeg',
+      prompt: 'أيّ الواجهتين تحترم تفضيل المستخدم في تقليل الحركة؟',
+      shortReason: 'تفعيل خيار «تقليل الحركة» يوقف الرسوم الدوّارة التي قد تسبب دواراً لبعض المستخدمين.',
+      goodAlt: 'إعدادات عرض تتضمن زر تقليل الحركة ومعاينة ثابتة هادئة للصفحة.',
+      badAlt: 'إعدادات عرض بدون خيار تقليل الحركة مع معاينة فيها حركات دوران مستمرة.',
+    },
+    {
+      id: 'ev-three-flashes',
+      topicAr: 'الحركة والرسوم المتحركة',
+      wcagCode: '2.3.1',
+      criterionAr: 'تجنّب الوميض السريع',
+      image: 'Animation & Motion/Three Flashes_1.jpeg',
+      prompt: 'أيّ مقطعي الفيديو آمن لسلامة المستخدمين ضد الوميض السريع؟',
+      shortReason: 'تجاوز 3 ومضات في الثانية قد يثير نوبات صرع حسّاس للضوء؛ الهدوء البصري ضروري.',
+      goodAlt: 'فيديو هادئ بنبضة واحدة أو أقل من 3 ومضات في الثانية.',
+      badAlt: 'فيديو يحتوي على 6 ومضات ساطعة في الثانية الواحدة.',
+    },
+    {
+      id: 'ev-timing-adjustable',
+      topicAr: 'الحركة والرسوم المتحركة',
+      wcagCode: '2.2.1',
+      criterionAr: 'إتاحة تعديل الوقت',
+      image: 'Animation & Motion/Timing Adjustable_1.jpeg',
+      prompt: 'أيّ رسالتي انتهاء الجلسة تراعي اختلاف سرعة المستخدمين؟',
+      shortReason: 'إتاحة زري «تمديد الوقت» أو «إيقاف المؤقّت» تمنع فقدان بيانات من يحتاجون وقتاً أطول.',
+      goodAlt: 'تنبيه انتهاء الجلسة يتضمن زري تمديد الوقت وإيقاف المؤقّت.',
+      badAlt: 'تنبيه انتهاء الجلسة بعدّاد تنازلي فقط دون أي خيار لتمديد الوقت.',
+    },
+
+    /* --- إضافات النماذج والإدخال والتركيز والتخطيط والوسائط والألوان (10) --- */
+    {
+      id: 'ev-error-prevention',
+      topicAr: 'النماذج وتقليل العوائق',
+      wcagCode: '3.3.4',
+      criterionAr: 'منع الأخطاء الخطيرة',
+      image: 'Forms & Friction/Error Prevention_1.jpeg',
+      prompt: 'أيّ واجهتي حذف الحساب تحمي المستخدم من الحذف غير المقصود؟',
+      shortReason: 'إظهار رسالة تأكيد مع زر «إلغاء وتراجع» يحمي من الإجراءات الحساسة غير القابلة للتراجع.',
+      goodAlt: 'نافذة تأكيد تسأل هل أنت متأكد من حذف حسابك مع زر إلغاء وتراجع.',
+      badAlt: 'زر حذف الحساب مباشرة دون أي خطوة تأكيد أو تراجع.',
+    },
+    {
+      id: 'ev-motion-actuation',
+      topicAr: 'الإدخال والإيماءات',
+      wcagCode: '2.5.4',
+      criterionAr: 'بدائل التفعيل بالحركة',
+      image: 'Input & Gestures/Motion Actuation_1.jpeg',
+      prompt: 'أيّ الواجهتين توفر طريقة متاحة للتراجع بعد حذف ملاحظة؟',
+      shortReason: 'توفير زر «تراجع» على الشاشة ضروري لمن لا يستطيعون هزّ الهاتف أو يستخدمونه مثبّتاً.',
+      goodAlt: 'إشعار تم حذف الملاحظة يظهر معه زر تراجع واضح قابل للنقر.',
+      badAlt: 'إشعار يطلب هزّ الهاتف فقط للتراجع بدون زر بديل على الشاشة.',
+    },
+    {
+      id: 'ev-content-hover-focus',
+      topicAr: 'التركيز التفاعلي',
+      wcagCode: '1.4.13',
+      criterionAr: 'المحتوى عند التمرير أو التركيز',
+      image: 'Interactive Focus/Content on Hover or Focus_1.jpeg',
+      prompt: 'أيّ تلميح المعلومات (Tooltip) يلتزم بمعايير الوصولية؟',
+      shortReason: 'التلميح المتاح يظهر كاملاً دون قصّ ويمكن إغلاقه بزر × أو بمفتاح Esc بسهولة.',
+      goodAlt: 'تلميح معلومات واضح يعرض النص كاملاً مع زر إغلاق وخيار Esc للإغلاق.',
+      badAlt: 'تلميح معلومات مقصوص من الحافة ولا يتيح إغلاقه بلوحة المفاتيح.',
+    },
+    {
+      id: 'ev-keyboard-access',
+      topicAr: 'التركيز التفاعلي',
+      wcagCode: '2.1.1',
+      criterionAr: 'الوصول الكامل بلوحة المفاتيح',
+      image: 'Interactive Focus/Keyboard_1.jpeg',
+      prompt: 'أيّ واجهتي اختيار التاريخ تدعم الاستخدام الكامل بلوحة المفاتيح؟',
+      shortReason: 'تمكين الوصول للحقل والزر بمفاتيح Tab و Enter يضمن عدم حصر الوظيفة بالفأرة فقط.',
+      goodAlt: 'حقل تاريخ وزر تأكيد قابلان للتركيز والتفعيل بلوحة المفاتيح عبر Tab و Enter.',
+      badAlt: 'حقل تاريخ يعتمد على مؤشّر الفأرة فقط دون إمكانية الوصول بلوحة المفاتيح.',
+    },
+    {
+      id: 'ev-no-keyboard-trap',
+      topicAr: 'التركيز التفاعلي',
+      wcagCode: '2.1.2',
+      criterionAr: 'عدم وجود فخّ للوحة المفاتيح',
+      image: 'Interactive Focus/No Keyboard Trap_1.jpeg',
+      prompt: 'أيّ نافذتي «تعديل الاسم» تسمح للمستخدم بالخروج بأمان؟',
+      shortReason: 'وجود زر «إلغاء» وزر إغلاق ودعم مفتاح Esc يمنع احتجاز مستخدم لوحة المفاتيح داخل النافذة.',
+      goodAlt: 'نافذة تعديل الاسم تحتوي على زر إغلاق وزر إلغاء ودعم مفتاح Esc للخروج.',
+      badAlt: 'نافذة تعديل الاسم تحصر التركيز داخل الحقل بدون زر إلغاء أو إغلاق.',
+    },
+    {
+      id: 'ev-meaningful-sequence',
+      topicAr: 'التخطيط والبنية',
+      wcagCode: '1.3.2',
+      criterionAr: 'التسلسل المنطقي للمحتوى',
+      image: 'Layout & Structure/Meaningful Sequence_1.jpeg',
+      prompt: 'أيّ الصفحتين ترتّب القراءة بتسلسل منطقي ومفهوم؟',
+      shortReason: 'ترتيب العنوان ثم نص القصة ثم «اقرأ المزيد» قبل الإعلان يحافظ على تسلسل القراءة الطبيعي.',
+      goodAlt: 'صفحة مرتّبة بتسلسل واضح: العنوان ثم فقرة القصة ثم اقرأ المزيد ثم بطاقة العروض.',
+      badAlt: 'صفحة يقطع فيها شريط العروض والاعلان سياق القراءة بين العنوان وبداية القصة.',
+    },
+    {
+      id: 'ev-orientation',
+      topicAr: 'التخطيط والبنية',
+      wcagCode: '1.3.4',
+      criterionAr: 'دعم اتجاهَي الشاشة',
+      image: 'Layout & Structure/Orientation.jpeg',
+      prompt: 'أيّ التطبيقين يلتزم بمرونة اتجاه الشاشة (عمودي وأفقي)؟',
+      shortReason: 'السماح بالعرض الأفقي والعمودي أساسي لمن يثبّتون أجهزتهم على حامل أو كرسي متحرك.',
+      goodAlt: 'تطبيق لوحة تحكم يتكيّف بسلاسة عند تدوير الهاتف للوضع الأفقي.',
+      badAlt: 'تطبيق يقفل الشاشة قسراً ويطلب من المستخدم تدوير الهاتف.',
+    },
+    {
+      id: 'ev-audio-control',
+      topicAr: 'الوسائط والصور',
+      wcagCode: '1.4.2',
+      criterionAr: 'التحكّم بالصوت التلقائي',
+      image: 'Media & Images/Audio Control_1.jpeg',
+      prompt: 'أيّ الواجهتين تتعامل بطريقة متاحة مع موسيقى الخلفية؟',
+      shortReason: 'أي صوت تلقائي يتجاوز 3 ثوانٍ يجب أن يوفّر زر إيقاف أو كتم فوري حتى لا يشوّش على قارئ الشاشة.',
+      goodAlt: 'شريط موسيقى خلفية يحتوي على زر إيقاف مؤقت واضح وسهل الوصول.',
+      badAlt: 'موسيقى خلفية تعمل تلقائياً لأكثر من 3 ثوانٍ دون أي زر للإيقاف.',
+    },
+    {
+      id: 'ev-non-text-content',
+      topicAr: 'الوسائط والصور',
+      wcagCode: '1.1.1',
+      criterionAr: 'النص البديل للصور (Alt Text)',
+      image: 'Media & Images/Non-text Content_1.jpeg',
+      prompt: 'أيّ البطاقتين تكتب سمة النص البديل (alt) بالطريقة الصحيحة؟',
+      shortReason: 'الصورة المعلوماتية تحتاج وصفاً واضحاً («جبل مغطى بالثلوج»)، بينما الزخرفية تُترك فارغة alt="".',
+      goodAlt: 'بطاقة تضع نصاً بديلاً وصفياً لصورة الجبل وسمة alt فارغة للخط الزخرفي.',
+      badAlt: 'بطاقة تترك صورة الجبل بلا وصف وتصف الخط الزخرفي بنص طويل غير مفيد.',
+    },
+    {
+      id: 'ev-contrast-enhanced',
+      topicAr: 'الألوان والمظهر',
+      wcagCode: '1.4.6',
+      criterionAr: 'تباين النصوص العالي',
+      image: 'Color & Appearance/Contrast (Enhanced)_1.jpeg',
+      prompt: 'أيّ البطاقتين تحقق تبايناً لونياً مريحاً وسهل القراءة؟',
+      shortReason: 'التباين المرتفع بين النص والخلفية يمكّن ضعاف البصر والجميع من القراءة بوضوح دون إجهاد.',
+      goodAlt: 'بطاقة بنص أسود داكن واضح وتباين عالٍ على خلفية بيضاء.',
+      badAlt: 'بطاقة بنص رمادي باهت جداً يصعب تمييزه على الخلفية البيضاء.',
     },
   ];
 
@@ -378,9 +523,59 @@
     return arr;
   }
 
-  function buildRandomDeck(count = 27) {
-    const shuffled = shuffleArray(EVENTS_CHALLENGE_BANK);
-    const picked = shuffled.slice(0, Math.min(count, shuffled.length));
+  const SESSION_SEEN_KEY = 'a11y_events_seen_ids_v1';
+  let lastShownCardId = '';
+
+  function loadSessionSeenIds() {
+    try {
+      const raw = sessionStorage.getItem(SESSION_SEEN_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return new Set(parsed);
+      }
+    } catch {
+      /* تجاهل */
+    }
+    return new Set();
+  }
+
+  let sessionSeenIds = loadSessionSeenIds();
+
+  function saveSessionSeenIds() {
+    try {
+      sessionStorage.setItem(SESSION_SEEN_KEY, JSON.stringify(Array.from(sessionSeenIds)));
+    } catch {
+      /* تجاهل */
+    }
+  }
+
+  function markCardSeen(challengeId) {
+    if (!challengeId || !BANK_BY_ID.has(challengeId)) return;
+    lastShownCardId = challengeId;
+    sessionSeenIds.add(challengeId);
+    if (sessionSeenIds.size >= EVENTS_CHALLENGE_BANK.length) {
+      /* تم استعراض كامل بنك الـ 40 صورة في هذه الجلسة — إعادة التدوير مع استثناء آخر بطاقة */
+      sessionSeenIds = new Set([challengeId]);
+    }
+    saveSessionSeenIds();
+  }
+
+  function buildRandomDeck(count = EVENTS_CHALLENGE_BANK.length) {
+    const targetCount = Math.min(count, EVENTS_CHALLENGE_BANK.length);
+    const unseen = shuffleArray(
+      EVENTS_CHALLENGE_BANK.filter((item) => !sessionSeenIds.has(item.id))
+    );
+    const seen = shuffleArray(
+      EVENTS_CHALLENGE_BANK.filter((item) => sessionSeenIds.has(item.id))
+    );
+
+    /* نضع جميع البطاقات غير المشاهَدة أولاً لمنع أي تكرار داخل الجلسة */
+    const ordered = unseen.concat(seen);
+    if (ordered.length > 1 && ordered[0].id === lastShownCardId) {
+      ordered.push(ordered.shift());
+    }
+
+    const picked = ordered.slice(0, targetCount);
     return picked.map((item) => ({
       challengeId: item.id,
       goodSide: Math.random() < 0.5 ? 'right' : 'left',
@@ -751,13 +946,18 @@
     clearLiveTimersAndStreams();
     activeMode = 'stage';
     const meta = getGameMeta(gameId);
-    const deck = buildRandomDeck(27);
+    const deck = buildRandomDeck(EVENTS_CHALLENGE_BANK.length);
 
     stageState = {
       gameId: meta.id,
       deck,
       roundIndex: 0,
-      totalRounds: meta.id === 'ten-in-a-row' ? 10 : meta.id === 'speed-blitz' ? 27 : totalRounds,
+      totalRounds:
+        meta.id === 'ten-in-a-row'
+          ? 10
+          : meta.id === 'speed-blitz'
+            ? EVENTS_CHALLENGE_BANK.length
+            : totalRounds,
       correctCount: 0,
       wrongCount: 0,
       streak: 0,
@@ -854,7 +1054,7 @@
       stageState.streak = 0;
       stageState.streakFailed = false;
       stageState.roundIndex = 0;
-      stageState.deck = buildRandomDeck(27);
+      stageState.deck = buildRandomDeck(EVENTS_CHALLENGE_BANK.length);
       stageState.revealed = false;
       stageState.chosenSide = null;
       renderStageView();
@@ -865,7 +1065,7 @@
     const nextIdx = stageState.roundIndex + 1;
     if (nextIdx >= stageState.totalRounds || nextIdx >= stageState.deck.length) {
       if (stageState.gameId === 'speed-blitz' && stageState.blitzRemaining > 0) {
-        stageState.deck = buildRandomDeck(27);
+        stageState.deck = buildRandomDeck(EVENTS_CHALLENGE_BANK.length);
         stageState.roundIndex = 0;
       } else {
         stageState.finished = true;
@@ -953,6 +1153,7 @@
 
     const currentCard = stageState.deck[stageState.roundIndex];
     const challenge = BANK_BY_ID.get(currentCard.challengeId);
+    markCardSeen(currentCard.challengeId);
     const correctSideAr = currentCard.goodSide === 'right' ? 'يمين' : 'يسار';
 
     /* صندوق النتيجة والسبب المختصر جداً — يظهر مباشرة أعلى الخيارين */
@@ -1114,7 +1315,7 @@
     clearLiveTimersAndStreams();
     activeMode = 'host';
     const meta = getGameMeta(gameId);
-    const deck = buildRandomDeck(27);
+    const deck = buildRandomDeck(EVENTS_CHALLENGE_BANK.length);
 
     rootEl.innerHTML = `
       <div class="event-stage-shell">
@@ -1499,7 +1700,7 @@
       rootEl.querySelector('#host-exit-btn')?.addEventListener('click', () => renderHub({ pushHash: true }));
       rootEl.querySelector('#host-new-game-btn')?.addEventListener('click', () => renderHub({ pushHash: true }));
       rootEl.querySelector('#host-restart-btn')?.addEventListener('click', () =>
-        sendHostAction('restart', { deck: buildRandomDeck(27) })
+        sendHostAction('restart', { deck: buildRandomDeck(EVENTS_CHALLENGE_BANK.length) })
       );
       return;
     }
@@ -1508,6 +1709,7 @@
     const currentCard = room.currentCard;
     const challenge = currentCard ? BANK_BY_ID.get(currentCard.challengeId) : null;
     if (!challenge) return;
+    markCardSeen(currentCard.challengeId);
 
     const isRevealed = room.status === 'revealed';
     const outcome = room.lastOutcome;
@@ -1673,7 +1875,7 @@
     });
     rootEl.querySelector('#host-next-btn')?.addEventListener('click', () => {
       if (room.gameType === 'ten-in-a-row' && room.streakFailed) {
-        sendHostAction('reset-streak', { deck: buildRandomDeck(27) });
+        sendHostAction('reset-streak', { deck: buildRandomDeck(EVENTS_CHALLENGE_BANK.length) });
       } else {
         sendHostAction('next');
       }
@@ -1918,6 +2120,7 @@
     const currentCard = room.currentCard;
     const challenge = currentCard ? BANK_BY_ID.get(currentCard.challengeId) : null;
     if (!challenge) return;
+    markCardSeen(currentCard.challengeId);
     const isRevealed = room.status === 'revealed';
     const didIGetRight = isRevealed && myVoteForRound === currentCard.goodSide;
     const correctSideAr = currentCard.goodSide === 'right' ? 'يمين' : 'يسار';

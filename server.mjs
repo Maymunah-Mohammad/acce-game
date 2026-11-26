@@ -558,10 +558,12 @@ function generateRoomCode() {
 function sanitizeEventDeck(rawDeck) {
   if (!Array.isArray(rawDeck)) return [];
   const cleaned = [];
+  const seenIds = new Set();
   for (const item of rawDeck.slice(0, 60)) {
     if (!item || typeof item.challengeId !== 'string') continue;
     const challengeId = item.challengeId.trim().slice(0, 80);
-    if (!challengeId) continue;
+    if (!challengeId || seenIds.has(challengeId)) continue;
+    seenIds.add(challengeId);
     const goodSide = item.goodSide === 'left' ? 'left' : 'right';
     cleaned.push({ challengeId, goodSide });
   }
