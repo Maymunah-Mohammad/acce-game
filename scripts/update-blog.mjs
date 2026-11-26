@@ -7,12 +7,24 @@
  *   GEMINI_API_KEY="your_key" node scripts/update-blog.mjs --dry-run
  */
 
+import { existsSync, mkdirSync, copyFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const BLOG_DATA_PATH = path.resolve(__dirname, '..', 'blog-data.json');
+const SEED_BLOG_PATH = path.resolve(__dirname, '..', 'blog-data.json');
+const RUNTIME_DATA_DIR =
+  process.env.DATA_DIR || (existsSync('/data') ? '/data' : null);
+
+let BLOG_DATA_PATH = SEED_BLOG_PATH;
+if (RUNTIME_DATA_DIR) {
+  mkdirSync(RUNTIME_DATA_DIR, { recursive: true });
+  BLOG_DATA_PATH = path.join(RUNTIME_DATA_DIR, 'blog-data.json');
+  if (!existsSync(BLOG_DATA_PATH) && existsSync(SEED_BLOG_PATH)) {
+    copyFileSync(SEED_BLOG_PATH, BLOG_DATA_PATH);
+  }
+}
 
 const API_KEY = process.env.GEMINI_API_KEY;
 const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';

@@ -1,0 +1,14 @@
+{
+  "name": "accessibility-game",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "تحدّي الوصولية — لعبة تفاعلية ومقالات حول معايير الوصولية الرقمية WCAG 2.2",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "update-blog": "node scripts/update-blog.mjs"
+  }
+}

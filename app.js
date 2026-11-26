@@ -459,8 +459,8 @@
     challengesGrid.appendChild(fragment);
   }
 
-  /* قراءة وعرض لوحة الصدارة */
-  function getLeaderboardData() {
+  /* قراءة وعرض لوحة الصدارة (من الخادم /api/leaderboard مع احتياطي محلي) */
+  function getLocalLeaderboardData() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
@@ -475,36 +475,56 @@
     return DEFAULT_LEADERBOARD;
   }
 
-  function renderLeaderboard(filter = 'all') {
+  function paintLeaderboardRows(entries, totalCount) {
+    if (!leaderboardBody) return;
+    leaderboardBody.innerHTML = '';
+
+    entries.forEach((entry, index) => {
+      const rank = index + 1;
+      const rankClass = rank <= 3 ? `rank-${rank}` : '';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><span class="rank-badge ${rankClass}">${rank}</span></td>
+        <td class="player-name">${escapeHtml(entry.name)}</td>
+        <td>${escapeHtml(entry.topic)}</td>
+        <td><span class="accuracy-pill">${Number(entry.accuracy)}%</span></td>
+        <td class="score-cell">${Number(entry.score).toLocaleString('ar-SA')} نقطة</td>
+      `;
+      leaderboardBody.appendChild(tr);
+    });
+
+    if (leaderboardCount) {
+      leaderboardCount.textContent = `عرض ${entries.length} من ${totalCount} لاعبين`;
+    }
+  }
+
+  async function renderLeaderboard(filter = 'all') {
     if (!leaderboardBody) return;
     activeFilter = filter;
 
-    const allEntries = getLeaderboardData().slice().sort((a, b) => b.score - a.score);
+    try {
+      const response = await fetch(`/api/leaderboard?filter=${encodeURIComponent(filter)}`, {
+        cache: 'no-store',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data && Array.isArray(data.entries)) {
+          paintLeaderboardRows(data.entries, Number(data.total ?? data.entries.length));
+          return;
+        }
+      }
+    } catch {
+      /* استخدام البيانات المحلية عند التشغيل الساكن بدون خادم */
+    }
+
+    const allEntries = getLocalLeaderboardData().slice().sort((a, b) => b.score - a.score);
     const filtered = allEntries.filter((entry) => {
       if (filter === 'week') return entry.period === 'week';
       if (filter === 'perfect') return entry.accuracy >= 95;
       return true;
     });
 
-    leaderboardBody.innerHTML = '';
-
-    filtered.forEach((entry, index) => {
-      const rank = index + 1;
-      const rankClass = rank <= 3 ? `rank-${rank}` : '';
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><span class="rank-badge ${rankClass}">${rank}</span></td>
-        <td class="player-name">${entry.name}</td>
-        <td>${entry.topic}</td>
-        <td><span class="accuracy-pill">${entry.accuracy}%</span></td>
-        <td class="score-cell">${entry.score.toLocaleString('ar-SA')} نقطة</td>
-      `;
-      leaderboardBody.appendChild(tr);
-    });
-
-    if (leaderboardCount) {
-      leaderboardCount.textContent = `عرض ${filtered.length} من ${allEntries.length} لاعبين`;
-    }
+    paintLeaderboardRows(filtered, allEntries.length);
   }
 
   const POLICY_CONTENT = {
@@ -648,21 +668,25 @@
     handleDialogKeydown(event);
   });
 
-  /* تحميل مقالات المدونة من blog-data.json */
+  /* تحميل المقالات من /api/blog (على Railway) مع احتياطي blog-data.json */
   async function loadBlogArticles() {
-    try {
-      const response = await fetch('./blog-data.json', { cache: 'no-cache' });
-      if (!response.ok) return;
-      const data = await response.json();
-      if (Array.isArray(data) && data.length > 0) {
-        blogArticles = data;
-        renderBlogList(activeBlogFilter);
-        if (window.location.hash.startsWith('#blog/')) {
-          syncViewFromHash();
+    const endpoints = ['/api/blog', './blog-data.json'];
+    for (const url of endpoints) {
+      try {
+        const response = await fetch(url, { cache: 'no-cache' });
+        if (!response.ok) continue;
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+          blogArticles = data;
+          renderBlogList(activeBlogFilter);
+          if (window.location.hash.startsWith('#blog/')) {
+            syncViewFromHash();
+          }
+          return;
         }
+      } catch {
+        /* تجربة المصدر التالي */
       }
-    } catch {
-      /* استخدام المقالات المضمنة كاحتياطي عند الفتح المباشر بدون خادم */
     }
   }
 
