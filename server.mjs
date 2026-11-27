@@ -797,6 +797,18 @@ const server = http.createServer(async (req, res) => {
       return res.end(req.method === 'HEAD' ? undefined : robotsTxt);
     }
 
+    /* أيقونة التبويب (favicon) باستخدام شعار الموقع */
+    if (pathname === '/favicon.ico' && (req.method === 'GET' || req.method === 'HEAD')) {
+      const iconPath = path.join(__dirname, 'assets', 'logo-mark.png');
+      if (existsSync(iconPath)) {
+        res.writeHead(200, {
+          'Content-Type': 'image/png',
+          'Cache-Control': 'public, max-age=86400',
+        });
+        return res.end(req.method === 'HEAD' ? undefined : await readFile(iconPath));
+      }
+    }
+
     /* صفحة مشاركة الملف العام للمستخدم مع بطاقة Open Graph مخصّصة لـ LinkedIn */
     const publicProfilePageMatch = pathname.match(/^\/u\/(\d+)$/);
     if (publicProfilePageMatch && (req.method === 'GET' || req.method === 'HEAD')) {
