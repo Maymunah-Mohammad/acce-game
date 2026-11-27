@@ -65,13 +65,14 @@
   }
 
   function formatDurationAr(totalSeconds) {
-    const secs = Math.max(0, Math.round(Number(totalSeconds) || 0));
-    if (secs === 0) return '—';
-    const minutes = Math.floor(secs / 60);
-    const rem = secs % 60;
-    if (minutes === 0) return `${rem} ث`;
-    if (rem === 0) return `${minutes} د`;
-    return `${minutes} د ${rem} ث`;
+    const raw = Number(totalSeconds);
+    if (!Number.isFinite(raw) || raw <= 0) return '—';
+    const safe = Math.max(0.05, raw);
+    const minutes = Math.floor(safe / 60);
+    const rem = Number((safe - minutes * 60).toFixed(2));
+    const remStr = rem.toFixed(2);
+    if (minutes === 0) return `${remStr} ث`;
+    return `${minutes} د ${remStr} ث`;
   }
 
   function readStoredList(key) {
@@ -284,7 +285,7 @@
           topicAr: topic.ar,
           accuracy,
           errors: Math.max(0, total - correct),
-          durationSeconds: Math.max(1, Math.round((loc.elapsedMs || 60000) / 1000)),
+          durationSeconds: Number((Math.max(50, loc.elapsedMs || 60000) / 1000).toFixed(2)),
           score: Number(loc.score || 0),
           completedAt: loc.completedAt || null,
           source: 'local',

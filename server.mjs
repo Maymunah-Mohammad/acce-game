@@ -139,6 +139,9 @@ if (!scoreColumns.has('errors')) {
 if (!scoreColumns.has('duration_seconds')) {
   db.exec(`ALTER TABLE scores ADD COLUMN duration_seconds INTEGER NOT NULL DEFAULT 90`);
 }
+if (!scoreColumns.has('duration_ms')) {
+  db.exec(`ALTER TABLE scores ADD COLUMN duration_ms INTEGER NOT NULL DEFAULT 0`);
+}
 
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_scores_player ON scores (name, topic);
@@ -395,13 +398,23 @@ async function readJsonBody(req, maxBytes = 8192) {
   return raw ? JSON.parse(raw) : {};
 }
 
+function getRowDurationMs(row) {
+  if (!row) return 60_000;
+  const ms = Number(row.duration_ms || 0);
+  if (Number.isFinite(ms) && ms > 0) return ms;
+  const sec = Number(row.duration_seconds ?? row.durationSeconds ?? 60);
+  return Math.max(50, Math.round(sec * 1000));
+}
+
 function isBetterAttempt(candidate, currentBest) {
   if (!currentBest) return true;
   if (candidate.errors !== currentBest.errors) {
     return candidate.errors < currentBest.errors;
   }
-  if (candidate.duration_seconds !== currentBest.duration_seconds) {
-    return candidate.duration_seconds < currentBest.duration_seconds;
+  const candMs = getRowDurationMs(candidate);
+  const bestMs = getRowDurationMs(currentBest);
+  if (candMs !== bestMs) {
+    return candMs < bestMs;
   }
   return candidate.accuracy > currentBest.accuracy;
 }
@@ -417,6 +430,7 @@ function getAggregatedLeaderboard(filter = 'all') {
          accuracy,
          errors,
          duration_seconds,
+         duration_ms,
          score,
          created_at,
          CASE WHEN datetime(created_at) >= datetime('now', '-7 days') THEN 1 ELSE 0 END AS is_recent_week
@@ -462,10 +476,10 @@ function getAggregatedLeaderboard(filter = 'all') {
     if (bestAttempts.length === 0) continue;
 
     const topicsCompleted = bestAttempts.length;
-    const avgDurationSeconds = Math.round(
-      bestAttempts.reduce((sum, a) => sum + Number(a.duration_seconds || 0), 0) /
-        topicsCompleted
+    const avgDurationMs = Math.round(
+      bestAttempts.reduce((sum, a) => sum + getRowDurationMs(a), 0) / topicsCompleted
     );
+    const avgDurationSeconds = Number((avgDurationMs / 1000).toFixed(2));
     const avgAccuracy = Math.round(
       bestAttempts.reduce((sum, a) => sum + Number(a.accuracy || 0), 0) /
         topicsCompleted
@@ -478,15 +492,19 @@ function getAggregatedLeaderboard(filter = 'all') {
       }
     }
 
+    const standoutMs = getRowDurationMs(standout);
+
     allPlayers.push({
       userId: player.userId,
       name: player.name,
       topicsCompleted,
+      avgDurationMs,
       avgDurationSeconds,
       avgAccuracy,
       bestTopic: standout.topic,
       bestTopicErrors: Number(standout.errors || 0),
-      bestTopicDurationSeconds: Number(standout.duration_seconds || 0),
+      bestTopicDurationMs: standoutMs,
+      bestTopicDurationSeconds: Number((standoutMs / 1000).toFixed(2)),
       period: player.isRecentWeek ? 'week' : 'all',
       latestAt: player.latestAt,
     });
@@ -496,8 +514,8 @@ function getAggregatedLeaderboard(filter = 'all') {
     if (b.topicsCompleted !== a.topicsCompleted) {
       return b.topicsCompleted - a.topicsCompleted;
     }
-    if (a.avgDurationSeconds !== b.avgDurationSeconds) {
-      return a.avgDurationSeconds - b.avgDurationSeconds;
+    if (a.avgDurationMs !== b.avgDurationMs) {
+      return a.avgDurationMs - b.avgDurationMs;
     }
     if (b.avgAccuracy !== a.avgAccuracy) {
       return b.avgAccuracy - a.avgAccuracy;
@@ -546,12 +564,12 @@ function escapeHtmlAttr(str) {
 }
 
 function formatShareDuration(sec) {
-  const s = Math.max(1, Math.min(7200, Math.round(Number(sec) || 60)));
+  const s = Math.max(0.05, Math.min(7200, Number(sec) || 60));
   const m = Math.floor(s / 60);
-  const r = s % 60;
-  if (m === 0) return `${r} ث`;
-  if (r === 0) return `${m} د`;
-  return `${m} د ${r} ث`;
+  const r = Number((s - m * 60).toFixed(2));
+  const rStr = r.toFixed(2);
+  if (m === 0) return `${rStr} ث`;
+  return `${m} د ${rStr} ث`;
 }
 
 /* تجميع بيانات الملف الشخصي (الخاص أو العام القابل للمشاركة) */
@@ -563,7 +581,7 @@ function buildUserProfilePayload(userId, { includePrivate = false } = {}) {
 
   const scoreRows = db
     .prepare(
-      `SELECT topic_id, topic, accuracy, errors, duration_seconds, score, created_at
+      `SELECT topic_id, topic, accuracy, errors, duration_seconds, duration_ms, score, created_at
        FROM scores
        WHERE user_id = ?
        ORDER BY datetime(created_at) DESC`
@@ -575,12 +593,14 @@ function buildUserProfilePayload(userId, { includePrivate = false } = {}) {
     const key = (row.topic_id && row.topic_id.trim()) || String(row.topic || '').trim();
     if (!key) continue;
     if (isBetterAttempt(row, bestByTopic[key])) {
+      const rowMs = getRowDurationMs(row);
       bestByTopic[key] = {
         topicId: key,
         topic: row.topic,
         accuracy: Number(row.accuracy || 0),
         errors: Number(row.errors || 0),
-        durationSeconds: Number(row.duration_seconds || 60),
+        duration_ms: rowMs,
+        durationSeconds: Number((rowMs / 1000).toFixed(2)),
         score: Number(row.score || 0),
         completedAt: row.created_at,
       };
@@ -1227,7 +1247,15 @@ const server = http.createServer(async (req, res) => {
       const topic = typeof body.topic === 'string' ? body.topic.trim().slice(0, 60) : 'تحدّي شامل';
       const accuracy = Math.round(Number(body.accuracy));
       const errors = Math.round(Number(body.errors ?? 0));
-      const durationSeconds = Math.round(Number(body.durationSeconds ?? 60));
+      const rawMs = Number(body.durationMs);
+      const rawSec = Number(body.durationSeconds ?? 60);
+      const durationMs =
+        Number.isFinite(rawMs) && rawMs > 0
+          ? Math.round(rawMs)
+          : Number.isFinite(rawSec)
+            ? Math.round(rawSec * 1000)
+            : NaN;
+      const durationSecondsLegacy = Math.max(1, Math.min(7200, Math.round(durationMs / 1000)));
       const score = Math.round(Number(body.score ?? 0));
 
       if (!Number.isFinite(accuracy) || accuracy < 0 || accuracy > 100) {
@@ -1236,7 +1264,7 @@ const server = http.createServer(async (req, res) => {
       if (!Number.isFinite(errors) || errors < 0 || errors > 100) {
         return sendJson(res, 400, { error: 'قيمة الأخطاء غير صالحة.' });
       }
-      if (!Number.isFinite(durationSeconds) || durationSeconds < 1 || durationSeconds > 7200) {
+      if (!Number.isFinite(durationMs) || durationMs < 50 || durationMs > 7_200_000) {
         return sendJson(res, 400, { error: 'قيمة الوقت غير صالحة.' });
       }
       if (!Number.isFinite(score) || score < 0 || score > 10000) {
@@ -1263,8 +1291,8 @@ const server = http.createServer(async (req, res) => {
       }
 
       const insert = db.prepare(
-        `INSERT INTO scores (user_id, name, topic_id, topic, accuracy, errors, duration_seconds, score)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO scores (user_id, name, topic_id, topic, accuracy, errors, duration_seconds, duration_ms, score)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       );
       const result = insert.run(
         sessionUser.id,
@@ -1273,7 +1301,8 @@ const server = http.createServer(async (req, res) => {
         topic,
         accuracy,
         errors,
-        durationSeconds,
+        durationSecondsLegacy,
+        durationMs,
         score
       );
 
@@ -1284,7 +1313,8 @@ const server = http.createServer(async (req, res) => {
         topic,
         accuracy,
         errors,
-        durationSeconds,
+        durationMs,
+        durationSeconds: Number((durationMs / 1000).toFixed(2)),
         score,
         period: 'week',
       });

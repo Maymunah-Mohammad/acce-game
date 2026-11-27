@@ -699,10 +699,11 @@
   }
 
   function formatTimerClock(totalMs) {
-    const totalSec = Math.max(0, Math.floor((Number(totalMs) || 0) / 1000));
-    const mins = Math.floor(totalSec / 60);
-    const secs = totalSec % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    const safeMs = Math.max(0, Math.round(Number(totalMs) || 0));
+    const mins = Math.floor(safeMs / 60_000);
+    const secs = Math.floor((safeMs % 60_000) / 1000);
+    const centis = Math.floor((safeMs % 1000) / 10);
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(centis).padStart(2, '0')}`;
   }
 
   function getSavedPlayerName() {
@@ -786,12 +787,14 @@
   }
 
   function formatDurationAr(totalSeconds) {
-    const secs = Math.max(1, Math.round(Number(totalSeconds) || 0));
-    const minutes = Math.floor(secs / 60);
-    const rem = secs % 60;
-    if (minutes === 0) return `${rem} ث`;
-    if (rem === 0) return `${minutes} د`;
-    return `${minutes} د ${rem} ث`;
+    const raw = Number(totalSeconds);
+    if (!Number.isFinite(raw) || raw <= 0) return '0.00 ث';
+    const safe = Math.max(0.05, raw);
+    const minutes = Math.floor(safe / 60);
+    const rem = Number((safe - minutes * 60).toFixed(2));
+    const remStr = rem.toFixed(2);
+    if (minutes === 0) return `${remStr} ث`;
+    return `${minutes} د ${remStr} ث`;
   }
 
   function formatTopicsCompletedAr(count) {
@@ -815,6 +818,7 @@
     accuracy,
     errors,
     durationSeconds,
+    durationMs,
     score,
   }) {
     try {
@@ -828,6 +832,7 @@
           accuracy,
           errors,
           durationSeconds,
+          durationMs,
           score,
         }),
       });
@@ -1788,7 +1793,7 @@
           if (timerClockEl) {
             timerClockEl.textContent = formatTimerClock(baseElapsedMs + (Date.now() - roundStartedAt));
           }
-        }, 250);
+        }, 50);
 
         if (choiceButtons[0]) choiceButtons[0].focus();
         announce('ظهرت البطاقتان الآن وبدأ احتساب الوقت');
@@ -1802,7 +1807,7 @@
         clearRoundTimer();
 
         const pickedGood = btn.dataset.isGood === 'true';
-        const roundElapsedMs = Math.max(500, Math.min(Date.now() - roundStartedAt, 300_000));
+        const roundElapsedMs = Math.max(50, Math.min(Date.now() - roundStartedAt, 300_000));
         const nextElapsedMs = baseElapsedMs + roundElapsedMs;
 
         if (timerPillEl) {
@@ -2051,7 +2056,8 @@
     const errors = Math.max(0, total - correct);
     const accuracy = Math.round((correct / total) * 100);
     const score = state.score || 0;
-    const durationSeconds = Math.max(1, Math.round((state.elapsedMs || total * 12_000) / 1000));
+    const durationMs = Math.max(50, Math.round(state.elapsedMs || total * 12_000));
+    const durationSeconds = Number((durationMs / 1000).toFixed(2));
     const rankTitle = getPerformanceTitle(accuracy);
     const accountName = currentUser.name || state.savedPlayerName || '';
     const providerLabel = currentUser.provider === 'linkedin' ? 'LinkedIn' : 'Google';
@@ -2320,6 +2326,7 @@
         accuracy,
         errors,
         durationSeconds,
+        durationMs,
         score,
       }).then((result) => {
         if (result.ok) {
