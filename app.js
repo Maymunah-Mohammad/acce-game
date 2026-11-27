@@ -1637,12 +1637,36 @@
     const goodFirst = Math.random() < 0.5;
     const options = goodFirst
       ? [
-          { letter: 'أ', isGood: true, cropClass: 'crop-top-left', alt: challenge.goodAlt },
-          { letter: 'ب', isGood: false, cropClass: 'crop-top-right', alt: challenge.badAlt },
+          {
+            letter: 'أ',
+            isGood: true,
+            cropClass: 'crop-top-left',
+            cropStyle: challenge.goodCropStyle || '',
+            alt: challenge.goodAlt,
+          },
+          {
+            letter: 'ب',
+            isGood: false,
+            cropClass: 'crop-top-right',
+            cropStyle: challenge.badCropStyle || '',
+            alt: challenge.badAlt,
+          },
         ]
       : [
-          { letter: 'أ', isGood: false, cropClass: 'crop-top-right', alt: challenge.badAlt },
-          { letter: 'ب', isGood: true, cropClass: 'crop-top-left', alt: challenge.goodAlt },
+          {
+            letter: 'أ',
+            isGood: false,
+            cropClass: 'crop-top-right',
+            cropStyle: challenge.badCropStyle || '',
+            alt: challenge.badAlt,
+          },
+          {
+            letter: 'ب',
+            isGood: true,
+            cropClass: 'crop-top-left',
+            cropStyle: challenge.goodCropStyle || '',
+            alt: challenge.goodAlt,
+          },
         ];
 
     playShellCard.innerHTML = `
@@ -1712,6 +1736,7 @@
                     src="${encodedImage}"
                     alt=""
                     class="choice-crop-img ${opt.cropClass}"
+                    ${opt.cropStyle ? `style="${escapeHtml(opt.cropStyle)}"` : ''}
                     loading="eager"
                   >
                 </div>
@@ -2137,13 +2162,13 @@
               <div class="review-compare-card is-good-card">
                 <span class="choice-verdict is-good">✓ التصميم المتوافق</span>
                 <div class="choice-crop-frame">
-                  <img src="${encodedImg}" alt="${escapeHtml(ch.goodAlt)}" class="choice-crop-img crop-top-left" loading="lazy">
+                  <img src="${encodedImg}" alt="${escapeHtml(ch.goodAlt)}" class="choice-crop-img crop-top-left" ${ch.goodCropStyle ? `style="${escapeHtml(ch.goodCropStyle)}"` : ''} loading="lazy">
                 </div>
               </div>
               <div class="review-compare-card is-bad-card">
                 <span class="choice-verdict is-bad">✕ يحتوي على عائق وصولية</span>
                 <div class="choice-crop-frame">
-                  <img src="${encodedImg}" alt="${escapeHtml(ch.badAlt)}" class="choice-crop-img crop-top-right" loading="lazy">
+                  <img src="${encodedImg}" alt="${escapeHtml(ch.badAlt)}" class="choice-crop-img crop-top-right" ${ch.badCropStyle ? `style="${escapeHtml(ch.badCropStyle)}"` : ''} loading="lazy">
                 </div>
               </div>
             </div>
