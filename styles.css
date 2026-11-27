@@ -2664,45 +2664,79 @@ body {
   gap: 0.85rem;
 }
 
+.dialog-box .oauth-buttons {
+  grid-template-columns: 1fr;
+}
+
+/* أزرار تسجيل الدخول الرسمية وفق إرشادات Google Identity و LinkedIn Brand */
 .oauth-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.65rem;
-  min-height: 3.2rem;
-  padding: 0.75rem 1.25rem;
-  border-radius: var(--radius-pill);
+  gap: 0.75rem;
+  min-height: 3rem; /* 48px >= 44px AAA */
+  padding: 0.65rem 1.25rem;
+  border-radius: 0.5rem;
   font-family: inherit;
-  font-size: 0.98rem;
-  font-weight: 700;
+  font-size: 0.96rem;
+  font-weight: 600;
   text-decoration: none;
   cursor: pointer;
-  border: 2px solid transparent;
-  transition: transform var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+  border: 1px solid transparent;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
 }
 
-.oauth-btn-linkedin {
-  background-color: var(--brand-primary);
-  color: #FFFFFF;
-  box-shadow: 0 8px 20px rgba(109, 40, 217, 0.22);
+.oauth-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  flex-shrink: 0;
 }
 
-.oauth-btn-linkedin:hover {
-  background-color: var(--brand-primary-hover);
-  transform: translateY(-1px);
+.oauth-btn-text {
+  line-height: 1.25;
 }
 
+/* الزر الرسمي لـ Google (خلفية بيضاء، حد #747775، نص #1F1F1F) */
 .oauth-btn-google {
-  background-color: var(--bg-surface);
-  color: var(--ink-primary);
-  border-color: var(--border-control);
-  box-shadow: var(--shadow-sm);
+  background-color: #FFFFFF;
+  color: #1F1F1F;
+  border-color: #747775;
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.16);
 }
 
 .oauth-btn-google:hover {
-  background-color: var(--yellow-soft);
-  border-color: var(--yellow-border);
+  background-color: #F7F8F8;
+  border-color: #5F6368;
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.28), 0 1px 2px rgba(60, 64, 67, 0.18);
   transform: translateY(-1px);
+}
+
+.oauth-btn-google:active {
+  background-color: #EEEEEE;
+  transform: translateY(0);
+}
+
+/* الزر الرسمي لـ LinkedIn (#0A66C2 مع شعار in أبيض رسمي) */
+.oauth-btn-linkedin {
+  background-color: #0A66C2;
+  color: #FFFFFF;
+  border-color: #0A66C2;
+  box-shadow: 0 2px 6px rgba(10, 102, 194, 0.24);
+}
+
+.oauth-btn-linkedin:hover {
+  background-color: #004182;
+  border-color: #004182;
+  box-shadow: 0 4px 12px rgba(0, 65, 130, 0.3);
+  transform: translateY(-1px);
+}
+
+.oauth-btn-linkedin:active {
+  background-color: #003366;
+  transform: translateY(0);
 }
 
 .auth-alert {

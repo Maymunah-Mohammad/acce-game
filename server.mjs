@@ -1415,7 +1415,7 @@ const server = http.createServer(async (req, res) => {
     const segments = relativePath.split('/').filter(Boolean);
 
     if (
-      segments.some((seg) => seg === '..' || seg.startsWith('.')) ||
+      segments.some((seg) => seg === '..' || seg.startsWith('.') || /^client_secret/i.test(seg)) ||
       (segments.length > 0 && BLOCKED_TOP_LEVEL.has(segments[0]))
     ) {
       res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
