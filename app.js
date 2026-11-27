@@ -476,48 +476,8 @@
     linkedin_failed: 'تعذّر إتمام تسجيل الدخول عبر LinkedIn. يرجى المحاولة مرة أخرى.',
   };
 
-  function clearLocalGameStorage() {
-    try {
-      localStorage.removeItem(PROGRESS_STORAGE_KEY);
-      localStorage.removeItem(PLAYER_NAME_STORAGE_KEY);
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      /* تجاهل أخطاء التخزين */
-    }
-  }
-
   function readAndClearAuthError() {
     const params = new URLSearchParams(window.location.search);
-    const isLocalHost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-    if (isLocalHost && params.get('reset') === '1') {
-      clearLocalGameStorage();
-      history.replaceState(null, '', `${window.location.pathname}#challenges`);
-      return;
-    }
-
-    const resetKey = (params.get('resetKey') || '').trim();
-    if (resetKey) {
-      history.replaceState(null, '', `${window.location.pathname}#challenges`);
-      fetch('/api/admin/reset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: resetKey }),
-      })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (data && data.ok) {
-            clearLocalGameStorage();
-            renderTopics();
-            renderChallenges();
-            renderLeaderboard(activeFilter);
-            setActiveView('challenges', { updateHash: true, moveFocus: false });
-            announce('تم تصفير بيانات التجربة بنجاح! يمكنك البدء من جديد الآن.');
-          }
-        })
-        .catch(() => {});
-      return;
-    }
-
     const err = params.get('authError') || '';
     if (err) {
       authErrorCode = err;

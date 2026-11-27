@@ -80,7 +80,6 @@ const GOOGLE_CLIENT_ID = (process.env.GOOGLE_CLIENT_ID || '').trim();
 const GOOGLE_CLIENT_SECRET = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
 const LINKEDIN_CLIENT_ID = (process.env.LINKEDIN_CLIENT_ID || '').trim();
 const LINKEDIN_CLIENT_SECRET = (process.env.LINKEDIN_CLIENT_SECRET || '').trim();
-const ADMIN_RESET_KEY = (process.env.ADMIN_RESET_KEY || '').trim();
 
 const hasGoogleAuth = Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET);
 const hasLinkedInAuth = Boolean(LINKEDIN_CLIENT_ID && LINKEDIN_CLIENT_SECRET);
@@ -913,35 +912,6 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/auth/logout' && req.method === 'POST') {
       const clearCookie = serializeCookie(SESSION_COOKIE, '', { maxAge: 0, secure });
       return sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearCookie });
-    }
-
-    /* مسح بيانات التجربة للمالك فقط عبر مفتاح سري في متغيرات Railway */
-    if (pathname === '/api/admin/reset' && req.method === 'POST') {
-      if (!ADMIN_RESET_KEY || ADMIN_RESET_KEY.length < 8) {
-        return sendJson(res, 403, { error: 'إعادة الضبط غير مفعّلة.' });
-      }
-      let body;
-      try {
-        body = await readJsonBody(req);
-      } catch {
-        return sendJson(res, 400, { error: 'طلب غير صالح.' });
-      }
-      const provided = typeof body.key === 'string' ? body.key.trim() : '';
-      const a = Buffer.from(provided);
-      const b = Buffer.from(ADMIN_RESET_KEY);
-      if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-        return sendJson(res, 403, { error: 'مفتاح إعادة الضبط غير صحيح.' });
-      }
-
-      const sessionUser = getSessionUser(req);
-      const del = sessionUser
-        ? db.prepare('DELETE FROM scores WHERE user_id = ?').run(sessionUser.id)
-        : db.prepare('DELETE FROM scores').run();
-
-      return sendJson(res, 200, {
-        ok: true,
-        deletedRows: Number(del.changes || 0),
-      });
     }
 
     /* واجهات ملف المستخدم الشخصي والملف العام ونشاط القراءة والفعاليات */
