@@ -55,10 +55,32 @@ const SESSION_COOKIE = 'a11y_session';
 const OAUTH_STATE_COOKIE = 'a11y_oauth_state';
 const SESSION_MAX_AGE_SEC = 30 * 24 * 60 * 60; /* 30 يوماً */
 
+/* تحميل ملف .env.local محلياً فقط عند التطوير (دون الكتابة فوق متغيرات Railway) */
+for (const envName of ['.env.local', '.env']) {
+  const envPath = path.join(__dirname, envName);
+  if (!existsSync(envPath)) continue;
+  const lines = readFileSync(envPath, 'utf8').split(/\r?\n/);
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+    const eqIdx = line.indexOf('=');
+    if (eqIdx === -1) continue;
+    const key = line.slice(0, eqIdx).trim();
+    let val = line.slice(eqIdx + 1).trim();
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1);
+    }
+    if (key && !(key in process.env)) {
+      process.env[key] = val;
+    }
+  }
+}
+
 const GOOGLE_CLIENT_ID = (process.env.GOOGLE_CLIENT_ID || '').trim();
 const GOOGLE_CLIENT_SECRET = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
 const LINKEDIN_CLIENT_ID = (process.env.LINKEDIN_CLIENT_ID || '').trim();
 const LINKEDIN_CLIENT_SECRET = (process.env.LINKEDIN_CLIENT_SECRET || '').trim();
+const ADMIN_RESET_KEY = (process.env.ADMIN_RESET_KEY || '').trim();
 
 const hasGoogleAuth = Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET);
 const hasLinkedInAuth = Boolean(LINKEDIN_CLIENT_ID && LINKEDIN_CLIENT_SECRET);
@@ -739,6 +761,36 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/auth/logout' && req.method === 'POST') {
       const clearCookie = serializeCookie(SESSION_COOKIE, '', { maxAge: 0, secure });
       return sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearCookie });
+    }
+
+    /* مسح بيانات التجربة للمالك فقط عبر مفتاح سري في متغيرات Railway */
+    if (pathname === '/api/admin/reset' && req.method === 'POST') {
+      if (!ADMIN_RESET_KEY || ADMIN_RESET_KEY.length < 8) {
+        return sendJson(res, 403, { error: 'إعادة الضبط غير مفعّلة.' });
+      }
+      let body;
+      try {
+        body = await readJsonBody(req);
+      } catch {
+        return sendJson(res, 400, { error: 'طلب غير صالح.' });
+      }
+      const provided = typeof body.key === 'string' ? body.key.trim() : '';
+      const a = Buffer.from(provided);
+      const b = Buffer.from(ADMIN_RESET_KEY);
+      if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+        return sendJson(res, 403, { error: 'مفتاح إعادة الضبط غير صحيح.' });
+      }
+
+      const seedNames = Array.from(new Set(SEED_ATTEMPTS.map((r) => r.name)));
+      const placeholders = seedNames.map(() => '?').join(', ');
+      const del = db
+        .prepare(`DELETE FROM scores WHERE user_id IS NOT NULL OR name NOT IN (${placeholders})`)
+        .run(...seedNames);
+
+      return sendJson(res, 200, {
+        ok: true,
+        deletedRows: Number(del.changes || 0),
+      });
     }
 
     /* بدء تسجيل الدخول عبر Google */
