@@ -2086,6 +2086,178 @@ body {
   border-color: rgba(202, 138, 4, 0.3);
 }
 
+.hud-pill-timer-state {
+  gap: 0.45rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-pill-timer-state.is-paused {
+  background-color: var(--yellow-soft);
+  color: var(--yellow-ink);
+  border-color: rgba(202, 138, 4, 0.34);
+}
+
+.hud-pill-timer-state.is-running {
+  background-color: var(--pink-soft);
+  color: var(--pink-ink);
+  border-color: rgba(219, 39, 119, 0.32);
+}
+
+.timer-clock-val {
+  font-weight: 700;
+}
+
+/* شاشة التعليمات المبسّطة قبل بدء التحدّي الأول */
+.topic-intro-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+.topic-intro-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+}
+
+.topic-intro-title {
+  margin: 0;
+  font-size: clamp(1.35rem, 2.3vw, 1.8rem);
+  font-weight: 700;
+  color: var(--ink-primary);
+  line-height: 1.4;
+}
+
+.topic-intro-desc {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--ink-secondary);
+  line-height: 1.65;
+  max-width: 62ch;
+}
+
+.topic-intro-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.intro-step-card {
+  padding: 1.1rem 1.15rem;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--border-subtle);
+  background-color: var(--bg-page);
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.intro-step-card.step-paused {
+  background-color: #FFFDF2;
+  border-color: rgba(202, 138, 4, 0.28);
+}
+
+.intro-step-card.step-running {
+  background-color: var(--purple-soft);
+  border-color: rgba(147, 51, 234, 0.28);
+}
+
+.intro-step-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.intro-step-num {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-surface);
+  color: var(--brand-primary);
+  font-weight: 700;
+  border: 1.5px solid var(--purple-mid);
+}
+
+.intro-timer-tag {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.2rem 0.65rem;
+  border-radius: var(--radius-pill);
+}
+
+.intro-timer-tag.is-paused {
+  background-color: var(--yellow-soft);
+  color: var(--yellow-ink);
+}
+
+.intro-timer-tag.is-running {
+  background-color: var(--pink-soft);
+  color: var(--pink-ink);
+}
+
+.intro-step-card h3 {
+  margin: 0;
+  font-size: 1.02rem;
+  color: var(--ink-primary);
+}
+
+.intro-step-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ink-secondary);
+  line-height: 1.55;
+}
+
+.topic-intro-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.topic-intro-start-btn {
+  min-height: 3.15rem;
+  font-size: 1.04rem;
+}
+
+/* صندوق إظهار الخيارين بعد قراءة السؤال */
+.reveal-choices-box {
+  padding: 1.65rem 1.35rem;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--purple-soft) 0%, var(--bg-page) 60%, var(--sky-soft) 100%);
+  border: 2px dashed var(--purple-mid);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.reveal-choices-note {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--ink-secondary);
+}
+
+.reveal-choices-btn {
+  min-height: 3.2rem;
+  padding-inline: 1.8rem;
+  font-size: 1.05rem;
+}
+
+@media (max-width: 820px) {
+  .topic-intro-steps {
+    grid-template-columns: 1fr;
+  }
+}
+
 .challenge-question-box {
   display: flex;
   flex-direction: column;

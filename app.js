@@ -480,6 +480,7 @@
   let lastFocusedBeforeDialog = null;
   let lastFocusedArticleTrigger = null;
   let activeCooldownTimerId = null;
+  let activeRoundTimerId = null;
 
   /* حالة المصادقة (Google / LinkedIn) */
   let currentUser = null;
@@ -688,6 +689,20 @@
       window.clearInterval(activeCooldownTimerId);
       activeCooldownTimerId = null;
     }
+  }
+
+  function clearRoundTimer() {
+    if (activeRoundTimerId !== null) {
+      window.clearInterval(activeRoundTimerId);
+      activeRoundTimerId = null;
+    }
+  }
+
+  function formatTimerClock(totalMs) {
+    const totalSec = Math.max(0, Math.floor((Number(totalMs) || 0) / 1000));
+    const mins = Math.floor(totalSec / 60);
+    const secs = totalSec % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   }
 
   function getSavedPlayerName() {
@@ -944,6 +959,7 @@
     } = {}
   ) {
     clearCooldownTimer();
+    clearRoundTimer();
     const validViews = ['home', 'challenges', 'events', 'play', 'blog', 'leaderboard', 'profile'];
     const targetView = validViews.includes(viewName) ? viewName : 'home';
 
@@ -1533,12 +1549,89 @@
     return 'بداية رائعة نحو التصميم الشامل';
   }
 
+  /* شاشة تعليمات مبسّطة قبل بدء التحدّي الأول في المحور (تناسب من 12 سنة فما فوق) */
+  function renderTopicInstructions(topic, challenges, state) {
+    clearCooldownTimer();
+    clearRoundTimer();
+
+    /* تحميل صورة السؤال الأول مسبقاً لتظهر فوراً عند الضغط */
+    if (challenges[0] && challenges[0].image) {
+      const preload = new Image();
+      preload.src = encodeURI(challenges[0].image);
+    }
+
+    playShellCard.innerHTML = `
+      <div class="topic-intro-card">
+        <div class="topic-intro-head">
+          <span class="hud-pill hud-pill-step">قبل البدء • ${challenges.length} تحديات</span>
+          <h2 class="topic-intro-title">خذ راحتك في القراءة.. الوقت ما يضيع عليك! ⏱️</h2>
+          <p class="topic-intro-desc">
+            المؤقّت في اللعبة عادل جداً: <strong>ما يحسب وقت قراءة السؤال ولا وقت قراءة الشرح</strong> — يحسب فقط من لحظة ظهور الصورتين إلى لحظة اختيارك!
+          </p>
+        </div>
+
+        <ol class="topic-intro-steps" aria-label="خطوات كل سؤال وكيفية عمل المؤقت">
+          <li class="intro-step-card step-paused">
+            <div class="intro-step-top">
+              <span class="intro-step-num" aria-hidden="true">1</span>
+              <span class="intro-timer-tag is-paused">⏸ المؤقّت متوقّف</span>
+            </div>
+            <h3>اقرأ السؤال بهدوء</h3>
+            <p>اقرأ السؤال على مهلك، ولن يبدأ الوقت أبداً حتى تضغط زر «جاهز — أظهر الخيارين».</p>
+          </li>
+
+          <li class="intro-step-card step-running">
+            <div class="intro-step-top">
+              <span class="intro-step-num" aria-hidden="true">2</span>
+              <span class="intro-timer-tag is-running">▶ المؤقّت يعمل</span>
+            </div>
+            <h3>قارن الصورتين واختر الأفضل</h3>
+            <p>يبدأ الوقت من لحظة ظهور البطاقتين ويتوقف فوراً لحظة نقرك على اختيارك.</p>
+          </li>
+
+          <li class="intro-step-card step-paused">
+            <div class="intro-step-top">
+              <span class="intro-step-num" aria-hidden="true">3</span>
+              <span class="intro-timer-tag is-paused">⏸ المؤقّت متوقّف</span>
+            </div>
+            <h3>اقرأ الشرح وتعلّم الفكرة</h3>
+            <p>بعد اختيارك يتوقّف الوقت فوراً لتقرأ لماذا كانت الإجابة صحيحة قبل الانتقال للسؤال التالي.</p>
+          </li>
+        </ol>
+
+        <div class="topic-intro-actions">
+          <button type="button" class="btn btn-primary topic-intro-start-btn" id="start-first-round-btn">
+            <span>فهمت! ابدأ السؤال الأول</span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M19 12H5M5 12L11 6M5 12L11 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    `;
+
+    const startBtn = playShellCard.querySelector('#start-first-round-btn');
+    if (startBtn) {
+      startBtn.focus();
+      startBtn.addEventListener('click', () => {
+        renderChallengeRound(topic, challenges, state);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    }
+  }
+
   /* عرض جولة تحدّي تفاعلية داخل ساحة المحور */
   function renderChallengeRound(topic, challenges, state) {
+    clearRoundTimer();
     const index = Math.min(state.currentIndex || 0, challenges.length - 1);
     const challenge = challenges[index];
     const percent = Math.round((index / challenges.length) * 100);
     const encodedImage = encodeURI(challenge.image);
+    const baseElapsedMs = Number(state.elapsedMs || 0);
+
+    /* تحميل الصورة في الخلفية أثناء قراءة السؤال حتى تظهر فوراً دون تأخير */
+    const preloader = new Image();
+    preloader.src = encodedImage;
 
     /* ترتيب عشوائي للبطاقتين (أ / ب) حتى لا يكون التصميم الصحيح في نفس الجهة دائماً */
     const goodFirst = Math.random() < 0.5;
@@ -1557,6 +1650,10 @@
         <div class="play-hud-pills">
           <span class="hud-pill hud-pill-step">تحدّي ${index + 1} من ${challenges.length}</span>
           <span class="hud-pill hud-pill-score">النقاط: ${(state.score || 0).toLocaleString('ar-SA')}</span>
+          <span class="hud-pill hud-pill-timer-state is-paused" id="challenge-live-timer" aria-live="off">
+            <span class="timer-clock-val" dir="ltr">${formatTimerClock(baseElapsedMs)}</span>
+            <span class="timer-state-text">⏸ متوقّف لقراءة السؤال</span>
+          </span>
           ${
             (state.streak || 0) >= 2
               ? `<span class="hud-pill hud-pill-streak">سلسلة ${state.streak} إجابات متتالية</span>`
@@ -1579,10 +1676,20 @@
 
       <div class="challenge-question-box">
         <h2 class="challenge-prompt">${escapeHtml(challenge.question)}</h2>
-        <p class="challenge-hint">اختر التصميم المتوافق مع معايير الوصولية الرقمية WCAG 2.2:</p>
+        <p class="challenge-hint" id="challenge-stage-hint">اقرأ السؤال بهدوء — المؤقّت متوقّف حتى تضغط على إظهار الخيارين.</p>
       </div>
 
-      <div class="choice-grid" role="group" aria-label="خيارات المقارنة البصرية">
+      <div id="reveal-choices-box" class="reveal-choices-box">
+        <p class="reveal-choices-note">عندما تنتهي من قراءة السؤال، اضغط الزر لعرض البطاقتين وبدء احتساب الوقت:</p>
+        <button type="button" class="btn btn-primary reveal-choices-btn" id="reveal-choices-btn">
+          <span>جاهز — أظهر الخيارين</span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M19 12H5M5 12L11 6M5 12L11 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <div id="choice-grid" class="choice-grid" role="group" aria-label="خيارات المقارنة البصرية" hidden>
         ${options
           .map(
             (opt, optIdx) => `
@@ -1617,15 +1724,72 @@
       <div id="challenge-feedback" class="feedback-panel" hidden aria-live="polite"></div>
     `;
 
+    const choiceGridEl = playShellCard.querySelector('#choice-grid');
+    const revealBoxEl = playShellCard.querySelector('#reveal-choices-box');
+    const revealBtn = playShellCard.querySelector('#reveal-choices-btn');
+    const stageHintEl = playShellCard.querySelector('#challenge-stage-hint');
+    const timerPillEl = playShellCard.querySelector('#challenge-live-timer');
+    const timerClockEl = timerPillEl && timerPillEl.querySelector('.timer-clock-val');
+    const timerStateEl = timerPillEl && timerPillEl.querySelector('.timer-state-text');
     const choiceButtons = playShellCard.querySelectorAll('.choice-card');
     const feedbackEl = playShellCard.querySelector('#challenge-feedback');
-    const roundStartedAt = Date.now();
+
+    let roundStartedAt = null;
+    let roundAnswered = false;
+
+    if (revealBtn) {
+      revealBtn.focus();
+      revealBtn.addEventListener('click', () => {
+        if (roundStartedAt !== null) return;
+        roundStartedAt = Date.now();
+        if (revealBoxEl) revealBoxEl.hidden = true;
+        if (choiceGridEl) choiceGridEl.hidden = false;
+        if (stageHintEl) {
+          stageHintEl.textContent = 'اختر التصميم المتوافق مع معايير الوصولية الرقمية WCAG 2.2:';
+        }
+        if (timerPillEl) {
+          timerPillEl.classList.remove('is-paused');
+          timerPillEl.classList.add('is-running');
+        }
+        if (timerStateEl) {
+          timerStateEl.textContent = '▶ المؤقّت يعمل';
+        }
+
+        activeRoundTimerId = window.setInterval(() => {
+          if (roundAnswered || roundStartedAt === null) {
+            clearRoundTimer();
+            return;
+          }
+          if (timerClockEl) {
+            timerClockEl.textContent = formatTimerClock(baseElapsedMs + (Date.now() - roundStartedAt));
+          }
+        }, 250);
+
+        if (choiceButtons[0]) choiceButtons[0].focus();
+        announce('ظهرت البطاقتان الآن وبدأ احتساب الوقت');
+      });
+    }
 
     choiceButtons.forEach((btn) => {
       btn.addEventListener('click', () => {
+        if (roundAnswered || roundStartedAt === null) return;
+        roundAnswered = true;
+        clearRoundTimer();
+
         const pickedGood = btn.dataset.isGood === 'true';
         const roundElapsedMs = Math.max(500, Math.min(Date.now() - roundStartedAt, 300_000));
-        const nextElapsedMs = (state.elapsedMs || 0) + roundElapsedMs;
+        const nextElapsedMs = baseElapsedMs + roundElapsedMs;
+
+        if (timerPillEl) {
+          timerPillEl.classList.remove('is-running');
+          timerPillEl.classList.add('is-paused');
+        }
+        if (timerClockEl) {
+          timerClockEl.textContent = formatTimerClock(nextElapsedMs);
+        }
+        if (timerStateEl) {
+          timerStateEl.textContent = '⏸ متوقّف لقراءة الشرح';
+        }
         const nextStreak = pickedGood ? (state.streak || 0) + 1 : 0;
         const streakBonus = pickedGood && nextStreak >= 2 ? 20 : 0;
         const earnedPoints = pickedGood ? 100 + streakBonus : 0;
@@ -2256,6 +2420,8 @@
         } else {
           renderAuthGate(topic, topicChallenges, progress);
         }
+      } else if ((progress.completed || 0) === 0) {
+        renderTopicInstructions(topic, topicChallenges, progress);
       } else {
         renderChallengeRound(topic, topicChallenges, progress);
       }
