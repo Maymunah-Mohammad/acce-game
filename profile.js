@@ -371,17 +371,25 @@
     const level = getLevelBadge(completedCount, readArticlesSet.size, triedEventsSet.size);
 
     /* قائمة الاستكشاف التفاعلية (الجديد وما لم تجرّبه بعد) */
-    const checklistItems = [
-      {
-        id: 'chk-topic-nav',
+    const playableTopicIds = Object.keys(window.ACCESSIBILITY_CHALLENGES || {});
+    const topicChecklistItems = playableTopicIds
+      .map((tid) => topics.find((t) => t.id === tid))
+      .filter(Boolean)
+      .map((topic) => ({
+        id: `chk-topic-${topic.id}`,
         category: 'تحدّي تفاعلي',
-        title: 'إتمام محور «التنقل وقابلية التنبؤ» (9 تحديات)',
-        desc: 'اختبر قدرتك على اكتشاف أخطاء التنقل والتركيز والتوقّع.',
-        done: Boolean(mastery['navigation-predictability']),
-        isNew: !mastery['navigation-predictability'],
-        actionLabel: mastery['navigation-predictability'] ? 'مراجعة الأجوبة' : 'ابدأ التحدّي',
-        hash: '#play/navigation-predictability',
-      },
+        title: `إتمام محور «${topic.ar}» (${topic.count} تحديات)`,
+        desc: topic.desc,
+        done: Boolean(mastery[topic.id]),
+        isNew: !mastery[topic.id],
+        actionLabel: mastery[topic.id] ? 'مراجعة الأجوبة' : 'ابدأ التحدّي',
+        hash: `#play/${topic.id}`,
+      }));
+
+    const nextPlayableTodo = topicChecklistItems.find((item) => !item.done) || null;
+
+    const checklistItems = [
+      ...topicChecklistItems,
       ...EVENT_CHECKLIST_ITEMS.map((ev) => ({
         id: `chk-ev-${ev.id}`,
         category: 'فعالية جماعية',
@@ -651,8 +659,8 @@
               <h3>✨ خطوتك المقترحة الآن</h3>
               <p class="insight-next-text">
                 ${
-                  !mastery['navigation-predictability']
-                    ? 'ابدأ بمحور «التنقل وقابلية التنبؤ» (9 تحديات بصرية تفاعلية) لترسم أول نقطة في خريطة مهاراتك!'
+                  nextPlayableTodo
+                    ? `جرّب ${escapeHtml(nextPlayableTodo.title)} لتوسيع خريطة مهاراتك في معايير WCAG 2.2!`
                     : unreadArticles.length > 0
                       ? `اقرأ مقال «${escapeHtml(unreadArticles[0].title)}» لتحديث معلوماتك في معايير الوصولية.`
                       : triedEventsSet.size < EVENT_CHECKLIST_ITEMS.length
@@ -662,8 +670,8 @@
               </p>
               <a
                 href="${
-                  !mastery['navigation-predictability']
-                    ? '#play/navigation-predictability'
+                  nextPlayableTodo
+                    ? escapeHtml(nextPlayableTodo.hash)
                     : unreadArticles.length > 0
                       ? `#blog/${escapeHtml(unreadArticles[0].slug)}`
                       : '#events'
@@ -672,8 +680,8 @@
                 id="profile-next-cta"
               >
                 ${
-                  !mastery['navigation-predictability']
-                    ? 'ابدأ محور التنقل الآن ←'
+                  nextPlayableTodo
+                    ? 'ابدأ المحور المقترح الآن ←'
                     : unreadArticles.length > 0
                       ? 'اقرأ المقال المقترح ←'
                       : 'اكتشف الفعاليات الجماعية ←'
