@@ -479,11 +479,7 @@ window.ACCESSIBILITY_CHALLENGES = {
       wcagLevel: 'AA',
       criterionAr: 'تباين مكونات الواجهة والأزرار',
       criterionEn: 'Non-text Contrast',
-      image: 'Color & Appearance/UI Component Contrast_1.jpeg',
-      goodCropStyle:
-        'width:285.71%;height:285.71%;left:-40.00%;top:-67.71%;clip-path:inset(27.5% 51% 44% 14%);',
-      badCropStyle:
-        'width:285.71%;height:285.71%;left:-145.71%;top:-67.71%;clip-path:inset(27.5% 14% 44% 51%);',
+      image: 'assets/ui-component-contrast-ar.png',
       question:
         'يريد المستخدم تمييز حدود حقل «البريد الإلكتروني» وزر «إرسال» بسرعة. أيّ التصميمين يلتزم بتباين عناصر الواجهة (3:1 على الأقل)؟',
       goodAlt:
