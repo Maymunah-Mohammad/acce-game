@@ -768,13 +768,13 @@ const server = http.createServer(async (req, res) => {
       return res.end(req.method === 'HEAD' ? undefined : robotsTxt);
     }
 
-    /* أيقونة التبويب (favicon) باستخدام شعار الموقع */
+    /* أيقونة التبويب (favicon) — دائرة بالتدرج اللوني الخماسي للموقع */
     if (pathname === '/favicon.ico' && (req.method === 'GET' || req.method === 'HEAD')) {
-      const iconPath = path.join(__dirname, 'assets', 'logo-mark.png');
+      const iconPath = path.join(__dirname, 'assets', 'favicon.png');
       if (existsSync(iconPath)) {
         res.writeHead(200, {
           'Content-Type': 'image/png',
-          'Cache-Control': 'public, max-age=86400',
+          'Cache-Control': 'public, max-age=3600',
         });
         return res.end(req.method === 'HEAD' ? undefined : await readFile(iconPath));
       }

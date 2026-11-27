@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <!-- تدرّج ناعم يجمع ألوان الموقع الخمسة بوضوح: بنفسجي • وردي • خوخي • أصفر هادئ • سماوي -->
+    <linearGradient id="site-palette-grad" x1="10%" y1="10%" x2="90%" y2="90%">
+      <stop offset="6%" stop-color="#6D28D9"/>
+      <stop offset="30%" stop-color="#F472B6"/>
+      <stop offset="53%" stop-color="#FDBA74"/>
+      <stop offset="73%" stop-color="#FDE047"/>
+      <stop offset="94%" stop-color="#4CC9E0"/>
+    </linearGradient>
+    <radialGradient id="soft-sheen" cx="30%" cy="24%" r="70%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.28"/>
+      <stop offset="55%" stop-color="#FFFFFF" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#581C87" stop-opacity="0.12"/>
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="32" r="30" fill="url(#site-palette-grad)"/>
+  <circle cx="32" cy="32" r="30" fill="url(#soft-sheen)"/>
+</svg>
