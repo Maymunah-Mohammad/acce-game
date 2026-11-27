@@ -148,48 +148,19 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_scores_user ON scores (user_id, topic_id);
 `);
 
-const SEED_ATTEMPTS = [
-  { name: 'سارة العتيبي', topicId: 'color-appearance', topic: 'الألوان والمظهر', accuracy: 100, errors: 0, durationSeconds: 48, score: 440, daysAgo: 1 },
-  { name: 'سارة العتيبي', topicId: 'navigation-predictability', topic: 'التنقل وقابلية التنبؤ', accuracy: 100, errors: 0, durationSeconds: 92, score: 1040, daysAgo: 1 },
-  { name: 'سارة العتيبي', topicId: 'interactive-focus', topic: 'التركيز التفاعلي', accuracy: 86, errors: 1, durationSeconds: 84, score: 660, daysAgo: 2 },
-  { name: 'سارة العتيبي', topicId: 'touch-targets', topic: 'اللمس وأحجام الأهداف', accuracy: 100, errors: 0, durationSeconds: 56, score: 220, daysAgo: 2 },
-
-  { name: 'خالد الحربي', topicId: 'interactive-focus', topic: 'التركيز التفاعلي', accuracy: 100, errors: 0, durationSeconds: 62, score: 800, daysAgo: 2 },
-  { name: 'خالد الحربي', topicId: 'navigation-predictability', topic: 'التنقل وقابلية التنبؤ', accuracy: 89, errors: 1, durationSeconds: 88, score: 900, daysAgo: 2 },
-  { name: 'خالد الحربي', topicId: 'forms-friction', topic: 'النماذج وتقليل العوائق', accuracy: 100, errors: 0, durationSeconds: 72, score: 680, daysAgo: 3 },
-
-  { name: 'نورة القحطاني', topicId: 'forms-friction', topic: 'النماذج وتقليل العوائق', accuracy: 100, errors: 0, durationSeconds: 70, score: 680, daysAgo: 9 },
-  { name: 'نورة القحطاني', topicId: 'navigation-predictability', topic: 'التنقل وقابلية التنبؤ', accuracy: 89, errors: 1, durationSeconds: 104, score: 880, daysAgo: 9 },
-  { name: 'نورة القحطاني', topicId: 'typography-reading', topic: 'الطباعة والقراءة', accuracy: 100, errors: 0, durationSeconds: 82, score: 440, daysAgo: 10 },
-
-  { name: 'عبدالله الشمري', topicId: 'navigation-predictability', topic: 'التنقل وقابلية التنبؤ', accuracy: 89, errors: 1, durationSeconds: 78, score: 900, daysAgo: 3 },
-  { name: 'عبدالله الشمري', topicId: 'layout-structure', topic: 'التخطيط والبنية', accuracy: 100, errors: 0, durationSeconds: 54, score: 340, daysAgo: 3 },
-
-  { name: 'ريم الدوسري', topicId: 'typography-reading', topic: 'الطباعة والقراءة', accuracy: 100, errors: 0, durationSeconds: 68, score: 440, daysAgo: 11 },
-  { name: 'ريم الدوسري', topicId: 'media-images', topic: 'الوسائط والصور', accuracy: 67, errors: 1, durationSeconds: 96, score: 200, daysAgo: 12 },
-
-  { name: 'فيصل الزهراني', topicId: 'layout-structure', topic: 'التخطيط والبنية', accuracy: 100, errors: 0, durationSeconds: 58, score: 340, daysAgo: 4 },
+/* إزالة الأسماء التجريبية الوهمية السابقة والاحتفاظ بنتائج اللاعبين الحقيقيين فقط */
+const LEGACY_DEMO_NAMES = [
+  'سارة العتيبي',
+  'خالد الحربي',
+  'نورة القحطاني',
+  'عبدالله الشمري',
+  'ريم الدوسري',
+  'فيصل الزهراني',
 ];
-
-const existingCount = db.prepare('SELECT COUNT(*) AS count FROM scores').get().count;
-if (existingCount === 0) {
-  const insertSeed = db.prepare(
-    `INSERT INTO scores (name, topic_id, topic, accuracy, errors, duration_seconds, score, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', ?))`
-  );
-  for (const row of SEED_ATTEMPTS) {
-    insertSeed.run(
-      row.name,
-      row.topicId,
-      row.topic,
-      row.accuracy,
-      row.errors,
-      row.durationSeconds,
-      row.score,
-      `-${row.daysAgo} days`
-    );
-  }
-}
+const demoPlaceholders = LEGACY_DEMO_NAMES.map(() => '?').join(', ');
+db.prepare(`DELETE FROM scores WHERE user_id IS NULL AND name IN (${demoPlaceholders})`).run(
+  ...LEGACY_DEMO_NAMES
+);
 
 /* أدوات الكوكيز والجلسات الموقّعة */
 function parseCookies(req) {
@@ -962,11 +933,10 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 403, { error: 'مفتاح إعادة الضبط غير صحيح.' });
       }
 
-      const seedNames = Array.from(new Set(SEED_ATTEMPTS.map((r) => r.name)));
-      const placeholders = seedNames.map(() => '?').join(', ');
-      const del = db
-        .prepare(`DELETE FROM scores WHERE user_id IS NOT NULL OR name NOT IN (${placeholders})`)
-        .run(...seedNames);
+      const sessionUser = getSessionUser(req);
+      const del = sessionUser
+        ? db.prepare('DELETE FROM scores WHERE user_id = ?').run(sessionUser.id)
+        : db.prepare('DELETE FROM scores').run();
 
       return sendJson(res, 200, {
         ok: true,

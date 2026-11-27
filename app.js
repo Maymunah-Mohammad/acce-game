@@ -215,29 +215,8 @@
     },
   ];
 
-  /* بيانات افتراضية للوحة الصدارة (تُستخدم كاحتياطي عند التشغيل بدون خادم) */
-  const DEFAULT_LEADERBOARD = [
-    { name: 'سارة العتيبي', topicId: 'color-appearance', topic: 'الألوان والمظهر', accuracy: 100, errors: 0, durationSeconds: 48, score: 440, period: 'week' },
-    { name: 'سارة العتيبي', topicId: 'navigation-predictability', topic: 'التنقل وقابلية التنبؤ', accuracy: 100, errors: 0, durationSeconds: 92, score: 1040, period: 'week' },
-    { name: 'سارة العتيبي', topicId: 'interactive-focus', topic: 'التركيز التفاعلي', accuracy: 86, errors: 1, durationSeconds: 84, score: 660, period: 'week' },
-    { name: 'سارة العتيبي', topicId: 'touch-targets', topic: 'اللمس وأحجام الأهداف', accuracy: 100, errors: 0, durationSeconds: 56, score: 220, period: 'week' },
-
-    { name: 'خالد الحربي', topicId: 'interactive-focus', topic: 'التركيز التفاعلي', accuracy: 100, errors: 0, durationSeconds: 62, score: 800, period: 'week' },
-    { name: 'خالد الحربي', topicId: 'navigation-predictability', topic: 'التنقل وقابلية التنبؤ', accuracy: 89, errors: 1, durationSeconds: 88, score: 900, period: 'week' },
-    { name: 'خالد الحربي', topicId: 'forms-friction', topic: 'النماذج وتقليل العوائق', accuracy: 100, errors: 0, durationSeconds: 72, score: 680, period: 'week' },
-
-    { name: 'نورة القحطاني', topicId: 'forms-friction', topic: 'النماذج وتقليل العوائق', accuracy: 100, errors: 0, durationSeconds: 70, score: 680, period: 'all' },
-    { name: 'نورة القحطاني', topicId: 'navigation-predictability', topic: 'التنقل وقابلية التنبؤ', accuracy: 89, errors: 1, durationSeconds: 104, score: 880, period: 'all' },
-    { name: 'نورة القحطاني', topicId: 'typography-reading', topic: 'الطباعة والقراءة', accuracy: 100, errors: 0, durationSeconds: 82, score: 440, period: 'all' },
-
-    { name: 'عبدالله الشمري', topicId: 'navigation-predictability', topic: 'التنقل وقابلية التنبؤ', accuracy: 89, errors: 1, durationSeconds: 78, score: 900, period: 'week' },
-    { name: 'عبدالله الشمري', topicId: 'layout-structure', topic: 'التخطيط والبنية', accuracy: 100, errors: 0, durationSeconds: 54, score: 340, period: 'week' },
-
-    { name: 'ريم الدوسري', topicId: 'typography-reading', topic: 'الطباعة والقراءة', accuracy: 100, errors: 0, durationSeconds: 68, score: 440, period: 'all' },
-    { name: 'ريم الدوسري', topicId: 'media-images', topic: 'الوسائط والصور', accuracy: 67, errors: 1, durationSeconds: 96, score: 200, period: 'all' },
-
-    { name: 'فيصل الزهراني', topicId: 'layout-structure', topic: 'التخطيط والبنية', accuracy: 100, errors: 0, durationSeconds: 58, score: 340, period: 'week' },
-  ];
+  /* لوحة الصدارة الاحتياطية (فارغة — تعرض نتائج اللاعبين الحقيقيين فقط) */
+  const DEFAULT_LEADERBOARD = [];
 
   const STORAGE_KEY = 'accessibility_game_leaderboard_v2';
   const PROGRESS_STORAGE_KEY = 'accessibility_game_progress_v1';
@@ -1282,6 +1261,21 @@
   function paintLeaderboardRows(entries, totalCount) {
     if (!leaderboardBody) return;
     leaderboardBody.innerHTML = '';
+
+    if (!entries || entries.length === 0) {
+      const emptyTr = document.createElement('tr');
+      emptyTr.innerHTML = `
+        <td colspan="6" style="text-align:center; padding: 2rem 1rem; color: var(--ink-secondary); justify-content: center;">
+          لا توجد نتائج مسجّلة في هذا التصنيف حتى الآن — أكمل أول محور وكن في صدارة اللوحة!
+        </td>
+      `;
+      leaderboardBody.appendChild(emptyTr);
+      if (leaderboardCount) {
+        leaderboardCount.textContent =
+          totalCount > 0 ? `عرض 0 من ${totalCount} لاعبين` : 'لا يوجد متصدّرون بعد';
+      }
+      return;
+    }
 
     entries.forEach((entry, index) => {
       const rank = index + 1;
