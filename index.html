@@ -23,7 +23,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=18">
+  <link rel="stylesheet" href="styles.css?v=19">
 </head>
 <body>
   <a href="#main-content" class="skip-link">تخطَّ إلى المحتوى الرئيسي</a>
@@ -461,6 +461,16 @@
           </div>
         </div>
       </section>
+      <!-- صفحة ملفي وإنجازاتي + الملف العام القابل للمشاركة -->
+      <section
+        id="profile-view"
+        class="view-section profile-section"
+        aria-labelledby="profile-heading"
+        data-view="profile"
+        hidden
+      >
+        <div class="container" id="profile-root"></div>
+      </section>
     </main>
 
     <!-- الذيل -->
@@ -579,7 +589,8 @@
 
   <script src="challenges-data.js?v=1"></script>
   <script src="qr.js?v=1"></script>
-  <script src="events.js?v=6"></script>
-  <script src="app.js?v=21"></script>
+  <script src="events.js?v=7"></script>
+  <script src="profile.js?v=1"></script>
+  <script src="app.js?v=22"></script>
 </body>
 </html>

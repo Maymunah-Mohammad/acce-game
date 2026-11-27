@@ -251,6 +251,7 @@
     play: 'ساحة التحدّي',
     blog: 'المقالات',
     leaderboard: 'لوحة الصدارة',
+    profile: 'ملفي وإنجازاتي',
   };
 
   /* مقالات المدونة الافتراضية (تُحدَّث ديناميكياً من ملف blog-data.json) */
@@ -573,8 +574,14 @@
     `;
   }
 
-  function openSignInDialog() {
-    const returnHash = window.location.hash || '#challenges';
+  function openSignInDialog(customReturnHash) {
+    const currentHash = window.location.hash || '#home';
+    const returnHash =
+      typeof customReturnHash === 'string' && customReturnHash.startsWith('#')
+        ? customReturnHash
+        : currentHash === '' || currentHash === '#' || currentHash === '#home'
+          ? '#profile'
+          : currentHash;
     const errorHtml =
       authErrorCode && AUTH_ERROR_MESSAGES[authErrorCode]
         ? `<div class="auth-alert" role="alert"><p>${escapeHtml(AUTH_ERROR_MESSAGES[authErrorCode])}</p></div>`
@@ -582,7 +589,7 @@
 
     openDialog({
       title: 'تسجيل الدخول',
-      desc: 'سجّل دخولك عبر LinkedIn أو حساب Google لحفظ نتائجك وإدراج اسمك تلقائياً في لوحة الصدارة (وفق معيار المصادقة الميسّرة WCAG 3.3.8).',
+      desc: 'سجّل دخولك عبر Google أو LinkedIn لحفظ نتائجك في لوحة الصدارة وعرض خريطة مهاراتك في «ملفي وإنجازاتي» (وفق معيار المصادقة الميسّرة WCAG 3.3.8).',
       richHtml: `${errorHtml}${buildOAuthButtonsHtml(returnHash)}`,
       showLeaderboardAction: false,
     });
@@ -600,11 +607,21 @@
 
       headerAuthEl.innerHTML = `
         <div class="user-chip">
-          ${avatarHtml}
-          <span class="user-chip-name">${escapeHtml(currentUser.name)}</span>
+          <a href="#profile" class="user-profile-link" id="header-profile-link" title="ملفي وإنجازاتي">
+            ${avatarHtml}
+            <span class="user-chip-name">${escapeHtml(currentUser.name)}</span>
+          </a>
           <button type="button" class="user-logout-btn" id="header-logout-btn">خروج</button>
         </div>
       `;
+
+      const profileLink = headerAuthEl.querySelector('#header-profile-link');
+      if (profileLink) {
+        profileLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          setActiveView('profile', { updateHash: true, moveFocus: true });
+        });
+      }
 
       const logoutBtn = headerAuthEl.querySelector('#header-logout-btn');
       if (logoutBtn) {
@@ -616,7 +633,11 @@
           }
           currentUser = null;
           renderHeaderAuth();
-          if (window.location.hash.startsWith('#play/')) {
+          if (
+            window.location.hash.startsWith('#play/') ||
+            window.location.hash === '#profile' ||
+            window.location.hash.startsWith('#u/')
+          ) {
             syncViewFromHash();
           }
           announce('تم تسجيل الخروج بنجاح');
@@ -630,7 +651,7 @@
     `;
     const loginBtn = headerAuthEl.querySelector('#header-login-btn');
     if (loginBtn) {
-      loginBtn.addEventListener('click', openSignInDialog);
+      loginBtn.addEventListener('click', () => openSignInDialog());
     }
   }
 
@@ -650,7 +671,11 @@
     } finally {
       authLoaded = true;
       renderHeaderAuth();
-      if (window.location.hash.startsWith('#play/')) {
+      if (
+        window.location.hash.startsWith('#play/') ||
+        window.location.hash === '#profile' ||
+        window.location.hash.startsWith('#u/')
+      ) {
         syncViewFromHash();
       } else if (authErrorCode && AUTH_ERROR_MESSAGES[authErrorCode]) {
         openSignInDialog();
@@ -906,13 +931,20 @@
     breadcrumbBar.hidden = false;
   }
 
-  /* التنقل بين الصفحات (الرئيسية / التحديات / الفعاليات / ساحة اللعب / المقالات / لوحة الصدارة) */
+  /* التنقل بين الصفحات (الرئيسية / التحديات / الفعاليات / ساحة اللعب / المقالات / لوحة الصدارة / ملفي) */
   function setActiveView(
     viewName,
-    { updateHash = true, moveFocus = false, articleSlug = null, topicId = null, eventSubPath = '' } = {}
+    {
+      updateHash = true,
+      moveFocus = false,
+      articleSlug = null,
+      topicId = null,
+      eventSubPath = '',
+      publicUserId = null,
+    } = {}
   ) {
     clearCooldownTimer();
-    const validViews = ['home', 'challenges', 'events', 'play', 'blog', 'leaderboard'];
+    const validViews = ['home', 'challenges', 'events', 'play', 'blog', 'leaderboard', 'profile'];
     const targetView = validViews.includes(viewName) ? viewName : 'home';
 
     if (targetView !== 'events' && window.EventsModule && typeof window.EventsModule.cleanup === 'function') {
@@ -982,11 +1014,22 @@
       topicId = topic.id;
     }
 
+    if (targetView === 'profile') {
+      if (window.ProfileModule) {
+        if (publicUserId) {
+          window.ProfileModule.renderPublicProfile(publicUserId);
+        } else {
+          window.ProfileModule.renderMyProfile();
+        }
+      }
+    }
+
     if (updateHash) {
       let nextHash = `#${targetView}`;
       if (targetView === 'blog' && articleSlug) nextHash = `#blog/${articleSlug}`;
       if (targetView === 'play' && topicId) nextHash = `#play/${topicId}`;
       if (targetView === 'events' && eventSubPath) nextHash = `#events/${eventSubPath}`;
+      if (targetView === 'profile' && publicUserId) nextHash = `#u/${publicUserId}`;
       if (window.location.hash !== nextHash) {
         history.pushState(null, '', nextHash);
       }
@@ -1032,6 +1075,15 @@
       setActiveView('blog', { updateHash: false, articleSlug: exists ? slug : null });
     } else if (hash === 'leaderboard') {
       setActiveView('leaderboard', { updateHash: false });
+    } else if (hash === 'profile') {
+      setActiveView('profile', { updateHash: false });
+    } else if (hash.startsWith('u/')) {
+      const uid = hash.slice('u/'.length).replace(/\D/g, '');
+      if (uid) {
+        setActiveView('profile', { updateHash: false, publicUserId: uid });
+      } else {
+        setActiveView('profile', { updateHash: false });
+      }
     } else {
       setActiveView('home', { updateHash: false });
     }
@@ -2457,6 +2509,10 @@
     blogListContainer.hidden = true;
     blogReader.hidden = false;
 
+    if (window.ProfileModule && typeof window.ProfileModule.recordArticleRead === 'function') {
+      window.ProfileModule.recordArticleRead(article.slug);
+    }
+
     renderBreadcrumbs([
       { label: 'الرئيسية', view: 'home', href: '#home' },
       { label: 'المقالات', view: 'blog', href: '#blog' },
@@ -2597,6 +2653,19 @@
   if (window.EventsModule && typeof window.EventsModule.init === 'function') {
     window.EventsModule.init({
       container: document.getElementById('events-root'),
+      announce,
+      renderBreadcrumbs,
+    });
+  }
+  if (window.ProfileModule && typeof window.ProfileModule.init === 'function') {
+    window.ProfileModule.init({
+      container: document.getElementById('profile-root'),
+      getTopics: () => WCAG_TOPICS,
+      getArticles: () => blogArticles,
+      getCurrentUser: () => currentUser,
+      loadTopicProgress,
+      buildOAuthButtonsHtml,
+      openSignInDialog,
       announce,
       renderBreadcrumbs,
     });

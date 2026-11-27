@@ -112,6 +112,15 @@ db.exec(`
     score INTEGER NOT NULL DEFAULT 0 CHECK (score >= 0 AND score <= 10000),
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS user_activity (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    activity_type TEXT NOT NULL CHECK (activity_type IN ('article', 'event')),
+    item_id TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (user_id, activity_type, item_id)
+  );
 `);
 
 const scoreColumns = new Set(
@@ -425,6 +434,7 @@ function getAggregatedLeaderboard(filter = 'all') {
 
     if (!playersMap.has(playerKey)) {
       playersMap.set(playerKey, {
+        userId: row.user_id ? Number(row.user_id) : null,
         name: String(row.name).trim(),
         topicsMap: new Map(),
         isRecentWeek: false,
@@ -469,6 +479,7 @@ function getAggregatedLeaderboard(filter = 'all') {
     }
 
     allPlayers.push({
+      userId: player.userId,
       name: player.name,
       topicsCompleted,
       avgDurationSeconds,
@@ -541,6 +552,91 @@ function formatShareDuration(sec) {
   if (m === 0) return `${r} ث`;
   if (r === 0) return `${m} د`;
   return `${m} د ${r} ث`;
+}
+
+/* تجميع بيانات الملف الشخصي (الخاص أو العام القابل للمشاركة) */
+function buildUserProfilePayload(userId, { includePrivate = false } = {}) {
+  const userRow = db
+    .prepare('SELECT id, provider, name, email, avatar_url, created_at FROM users WHERE id = ?')
+    .get(Number(userId));
+  if (!userRow) return null;
+
+  const scoreRows = db
+    .prepare(
+      `SELECT topic_id, topic, accuracy, errors, duration_seconds, score, created_at
+       FROM scores
+       WHERE user_id = ?
+       ORDER BY datetime(created_at) DESC`
+    )
+    .all(userRow.id);
+
+  const bestByTopic = {};
+  for (const row of scoreRows) {
+    const key = (row.topic_id && row.topic_id.trim()) || String(row.topic || '').trim();
+    if (!key) continue;
+    if (isBetterAttempt(row, bestByTopic[key])) {
+      bestByTopic[key] = {
+        topicId: key,
+        topic: row.topic,
+        accuracy: Number(row.accuracy || 0),
+        errors: Number(row.errors || 0),
+        durationSeconds: Number(row.duration_seconds || 60),
+        score: Number(row.score || 0),
+        completedAt: row.created_at,
+      };
+    }
+  }
+
+  const lb = getAggregatedLeaderboard('all');
+  const rankIdx = lb.entries.findIndex((entry) => entry.userId === userRow.id);
+  const lbEntry = rankIdx >= 0 ? lb.entries[rankIdx] : null;
+  const bestList = Object.values(bestByTopic);
+
+  const stats = {
+    rank: rankIdx >= 0 ? rankIdx + 1 : null,
+    totalPlayers: lb.total,
+    topicsCompleted: lbEntry ? lbEntry.topicsCompleted : bestList.length,
+    avgAccuracy: lbEntry
+      ? lbEntry.avgAccuracy
+      : bestList.length > 0
+        ? Math.round(bestList.reduce((s, r) => s + r.accuracy, 0) / bestList.length)
+        : 0,
+    avgDurationSeconds: lbEntry
+      ? lbEntry.avgDurationSeconds
+      : bestList.length > 0
+        ? Math.round(bestList.reduce((s, r) => s + r.durationSeconds, 0) / bestList.length)
+        : 0,
+    bestTopic: lbEntry ? lbEntry.bestTopic : '',
+    bestTopicErrors: lbEntry ? lbEntry.bestTopicErrors : 0,
+    bestTopicDurationSeconds: lbEntry ? lbEntry.bestTopicDurationSeconds : 0,
+  };
+
+  const payload = {
+    user: {
+      id: userRow.id,
+      name: userRow.name,
+      provider: userRow.provider,
+      avatarUrl: userRow.avatar_url || '',
+      memberSince: userRow.created_at || '',
+      ...(includePrivate ? { email: userRow.email || '' } : {}),
+    },
+    stats,
+    topicScores: bestByTopic,
+  };
+
+  if (includePrivate) {
+    const activities = db
+      .prepare('SELECT activity_type, item_id FROM user_activity WHERE user_id = ?')
+      .all(userRow.id);
+    payload.readArticles = activities
+      .filter((a) => a.activity_type === 'article')
+      .map((a) => a.item_id);
+    payload.triedEvents = activities
+      .filter((a) => a.activity_type === 'event')
+      .map((a) => a.item_id);
+  }
+
+  return payload;
 }
 
 /* =========================================================================
@@ -681,6 +777,59 @@ const server = http.createServer(async (req, res) => {
       return res.end(req.method === 'HEAD' ? undefined : robotsTxt);
     }
 
+    /* صفحة مشاركة الملف العام للمستخدم مع بطاقة Open Graph مخصّصة لـ LinkedIn */
+    const publicProfilePageMatch = pathname.match(/^\/u\/(\d+)$/);
+    if (publicProfilePageMatch && (req.method === 'GET' || req.method === 'HEAD')) {
+      const targetUid = Number(publicProfilePageMatch[1]);
+      const profile = buildUserProfilePayload(targetUid, { includePrivate: false });
+      const baseOrigin = 'https://accessibility-game.up.railway.app';
+      const canonicalUrl = `${baseOrigin}/u/${targetUid}`;
+      const ogTitle = profile
+        ? `ملف إنجازات ${profile.user.name} في تحدّي الوصولية (WCAG 2.2)`
+        : 'تحدّي الوصولية — اختبر مهاراتك في معايير WCAG 2.2';
+      const ogDesc = profile
+        ? `أتمّ ${profile.stats.topicsCompleted} من 10 محاور${profile.stats.avgAccuracy ? ` بمتوسط دقة ${profile.stats.avgAccuracy}%` : ''}${profile.stats.rank ? ` • المركز #${profile.stats.rank} في لوحة الصدارة` : ''} — استعرض خريطة المهارات والإنجازات الآن!`
+        : 'لعبة تعليمية تفاعلية لمعايير الوصولية الرقمية WCAG 2.2 ضمن مبادرات #عام_الذكاء_الاصطناعي.';
+
+      const html = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>${escapeHtmlAttr(ogTitle)}</title>
+  <meta name="description" content="${escapeHtmlAttr(ogDesc)}">
+  <meta property="og:type" content="profile">
+  <meta property="og:locale" content="ar_SA">
+  <meta property="og:site_name" content="تحدّي الوصولية">
+  <meta property="og:title" content="${escapeHtmlAttr(ogTitle)}">
+  <meta property="og:description" content="${escapeHtmlAttr(ogDesc)}">
+  <meta property="og:url" content="${escapeHtmlAttr(canonicalUrl)}">
+  <meta property="og:image" content="${baseOrigin}/og-share-card.png">
+  <meta property="og:image:secure_url" content="${baseOrigin}/og-share-card.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${escapeHtmlAttr(ogTitle)}">
+  <meta name="twitter:description" content="${escapeHtmlAttr(ogDesc)}">
+  <meta name="twitter:image" content="${baseOrigin}/og-share-card.png">
+</head>
+<body>
+  <main>
+    <h1>${escapeHtmlAttr(ogTitle)}</h1>
+    <p>${escapeHtmlAttr(ogDesc)}</p>
+    <p><a href="${baseOrigin}/#u/${targetUid}">عرض ملف الإنجازات التفاعلي</a></p>
+  </main>
+  <script>window.location.replace('${baseOrigin}/#u/${targetUid}');</script>
+</body>
+</html>`;
+
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'public, max-age=180',
+      });
+      return res.end(req.method === 'HEAD' ? undefined : html);
+    }
+
     /* صفحة مشاركة مخصّصة لـ LinkedIn Open Graph */
     if (pathname === '/share' && (req.method === 'GET' || req.method === 'HEAD')) {
       const topicId = reqUrl.searchParams.get('topic') || '';
@@ -791,6 +940,48 @@ const server = http.createServer(async (req, res) => {
         ok: true,
         deletedRows: Number(del.changes || 0),
       });
+    }
+
+    /* واجهات ملف المستخدم الشخصي والملف العام ونشاط القراءة والفعاليات */
+    if (pathname === '/api/profile/me' && req.method === 'GET') {
+      const sessionUser = getSessionUser(req);
+      if (!sessionUser) {
+        return sendJson(res, 401, { error: 'يرجى تسجيل الدخول أولاً.' });
+      }
+      const profile = buildUserProfilePayload(sessionUser.id, { includePrivate: true });
+      return sendJson(res, 200, profile);
+    }
+
+    if (pathname === '/api/profile/activity' && req.method === 'POST') {
+      const sessionUser = getSessionUser(req);
+      if (!sessionUser) {
+        return sendJson(res, 200, { ok: false, skipped: true });
+      }
+      let body;
+      try {
+        body = await readJsonBody(req);
+      } catch {
+        return sendJson(res, 400, { error: 'بيانات النشاط غير صالحة.' });
+      }
+      const type = body.type === 'article' || body.type === 'event' ? body.type : null;
+      const itemId = typeof body.itemId === 'string' ? body.itemId.trim().slice(0, 80) : '';
+      if (!type || !itemId) {
+        return sendJson(res, 400, { error: 'نوع أو معرّف النشاط غير صالح.' });
+      }
+      db.prepare(
+        `INSERT OR IGNORE INTO user_activity (user_id, activity_type, item_id) VALUES (?, ?, ?)`
+      ).run(sessionUser.id, type, itemId);
+      return sendJson(res, 200, { ok: true, type, itemId });
+    }
+
+    const publicProfileApiMatch = pathname.match(/^\/api\/profile\/public\/(\d+)$/);
+    if (publicProfileApiMatch && req.method === 'GET') {
+      const targetUid = Number(publicProfileApiMatch[1]);
+      const profile = buildUserProfilePayload(targetUid, { includePrivate: false });
+      if (!profile) {
+        return sendJson(res, 404, { error: 'لم يتم العثور على هذا الملف العام.' });
+      }
+      return sendJson(res, 200, profile);
     }
 
     /* بدء تسجيل الدخول عبر Google */

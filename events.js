@@ -946,6 +946,9 @@
     clearLiveTimersAndStreams();
     activeMode = 'stage';
     const meta = getGameMeta(gameId);
+    if (window.ProfileModule && typeof window.ProfileModule.recordEventPlayed === 'function') {
+      window.ProfileModule.recordEventPlayed(meta.id);
+    }
     const deck = buildRandomDeck(EVENTS_CHALLENGE_BANK.length);
 
     stageState = {
@@ -1315,6 +1318,9 @@
     clearLiveTimersAndStreams();
     activeMode = 'host';
     const meta = getGameMeta(gameId);
+    if (window.ProfileModule && typeof window.ProfileModule.recordEventPlayed === 'function') {
+      window.ProfileModule.recordEventPlayed(meta.id);
+    }
     const deck = buildRandomDeck(EVENTS_CHALLENGE_BANK.length);
 
     rootEl.innerHTML = `
@@ -1523,7 +1529,7 @@
       return '<p class="event-empty-players">لم ينضم مشاركون بجوالاتهم في هذه الجلسة.</p>';
     }
     const top3 = players.slice(0, 3);
-    const medals = ['😎', '😤', '😅'];
+    const medals = ['🥇', '🥈', '🥉'];
     const podiumHtml = `
       <div class="event-podium" aria-label="منصة الفائزين">
         ${top3
